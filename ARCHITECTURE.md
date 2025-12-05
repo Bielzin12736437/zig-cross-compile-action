@@ -1,57 +1,104 @@
-# Architecture: Zig Cross-Compiler Action
+# Technical Design: Zig Cross-Compiler Action (v2.x)
 
-## Core Principle
-Eliminates Docker storage/CPU overhead by using Zig's toolchain (`zig cc`, `zig c++`) as a drop-in C/C++ cross-compiler. Zig bundles libc source (musl, glibc) and headers for multiple architectures, allowing reliable cross-compilation from a standard runner.
+**Status:** Production (v2.2.0)
+**Philosophy:** Infrastructure, Not Helper.
+**Core Toolchain:** Zig `cc` / `c++`.
 
-## Components
+## 0. Context & Goals
+The `zig-cross-compile-action` is a rigorous, Docker-free toolchain injection for GitHub Actions. It replaces heavy containerized solutions (like `cross-rs`) with Zig's native ability to cross-compile C/C++ code, leveraging its bundled libc and linker.
 
-### 1. Interface (`action.yml`)
-Composite action.
-- **Inputs**: `target` (required), `cmd` (required), `version` (default: 0.13.0), `project-type`.
-- **Execution**:
-    1. **Setup**: Sources `setup-env.sh` to mutate the environment.
-    2. **Install**: Installs Zig toolchain via `goto-bus-stop/setup-zig`.
-    3. **Build**: Executes user `cmd` directly in the shell (no `eval` or extra `bash -c` wrapper).
-    4. **Verify**: Heuristic verification (checks for binary format) if not on Windows.
+**Current State (v2.2.0):**
+*   **Zero Docker:** Runs directly on the host runner (Linux/macOS).
+*   **Opinionated:** Unconditionally claims `$CC`, `$CXX`, `$AR`, `$RANLIB`.
+*   **Strict Policies:** Hard fail on Windows hosts; opt-in only for Rust+Musl.
+*   **Smart Automation:** Detects `Cargo.toml`/`go.mod` to apply correct environment policies.
 
-### 2. Logic Controller (`setup-env.sh`)
-Bash script responsible for environment mutation.
+**Goals:**
+1.  **Transparency:** No hidden magic. Errors should be explicit and actionable.
+2.  **Performance:** Zero container overhead.
+3.  **Correctness:** Prefer explicit failure over "best effort" behavior that breaks silently.
 
-#### Safety & robustness
-- **Mode**: Runs with `set -euo pipefail` for strict error handling and undefined variable detection.
-- **Sourcing**: Detects if it is being sourced. In CI, errors fall through to fail the step. Lokaal usage is guarded with warnings.
-- **Sanitization**: `target` input is regex-validated `^[a-zA-Z0-9_\.-]+$` to prevent injection.
+## 1. Scope & Boundaries
+To maintain maintainability and trust, we define strict boundaries.
 
-#### Target Aliasing
-Maps CI-friendly names to canonical Zig compilation targets using `case` statements.
-- `linux-arm64` -> `aarch64-linux-musl` (Static default)
-- `macos-arm64` -> `aarch64-macos`
+### 1.1 In Scope
+*   Cross-compiling C, C++, Rust, and Go binaries via Zig.
+*   Mapping strict aliases (e.g., `linux-arm64`) to Zig triples (`aarch64-linux-musl`).
+*   Injecting compiler environment variables into the GitHub Action job.
 
-#### Compiler Injection
-Exports standard make/build variables via `$GITHUB_ENV`.
-```bash
-export CC="zig cc -target $ZIG_TARGET"
-export CXX="zig c++ -target $ZIG_TARGET"
-export AR="zig ar"
-export RANLIB="zig ranlib"
-```
+### 1.2 Non-Goals
+*   **Build Orchestration:** We do not manage `go mod`, `cargo build`, or `make`. We provide the *compiler*; the user provides the *build command*.
+*   **Toolchain Management:** We do not install Rust (rustup) or Go. That is the user's responsibility.
+*   **Windows Host Support:** Bash on Windows (MSYS/Git Bash) is inconsistent. We only support Windows as a *target*, not a *host*.
+*   **Project Mutation:** We never touch `Cargo.toml`, `.cargo/config`, or source files.
 
-#### Language Specifics
+## 2. Architecture (v2.2.0)
 
-**Go (CGO)**
-- Triggered if `project-type` is `go` or `auto`.
-- Sets `CGO_ENABLED=1`.
-- Infers `GOOS` and `GOARCH` from the Zig target string.
+### 2.1 Interface (`action.yml`)
+The interface is minimal and typed.
 
-**Rust**
-- Triggered if `project-type` is `rust` or `auto`.
-- **Constraint**: Cargo linker arguments cannot handle spaces (e.g., `zig cc -target ...`).
-- **Solution**: Generates a wrapper script in `${RUNNER_TEMP}/zig-wrappers/cc-<target>`.
-- **Triple Mapping**:
-    - Maps Zig targets to Rust conventions (e.g., `aarch64-linux-musl` -> `aarch64-unknown-linux-musl`).
-    - Skips configuration if target contains a version suffix (e.g. `.2.31`) to prevent invalid environment variable names.
-- **Export**: `CARGO_TARGET_<SANITIZED_TRIPLE>_LINKER=/path/to/wrapper`.
-- **Note**: Does *not* install the rust target or run cargo; the user remains responsible for `rustup target add`.
+| Input | Description | default |
+| :--- | :--- | :--- |
+| `version` | Zig version to install. | `0.13.0` |
+| `target` | Compile target (alias or triple). | **Required** |
+| `project-type` | `auto` (smart), `go`, `rust`, `c`, `custom`. | `auto` |
+| `rust-musl-mode` | Policy for Rust+Musl conflicts (`deny`\|`warn`\|`allow`). | `deny` |
 
-## Verification
-Post-build check runs `find` and `file` on artifacts to confirm correct architecture (ELF/Mach-O), guarded by `runner.os != 'Windows'`.
+### 2.2 The Controller (`setup-env.sh`)
+The core logic resides in a Bash script sourceable by the action.
+
+**Key Mechanics:**
+1.  **Platform Guard:** Hard `die` if `RUNNER_OS == Windows`.
+2.  **Smart Auto-Detection:**
+    *   If `project-type: auto`: Check for `Cargo.toml` -> Rust mode. Check for `go.mod` -> Go mode. Else -> C mode.
+    *   *Rationale:* Prevents false positives where Rust policies block pure Go projects on Musl.
+3.  **Target Normalization:**
+    *   Maps naive CI targets (`linux-arm64`) to robust Zig defaults (`aarch64-linux-musl`).
+    *   *Design Choice:* Musl is the default for Linux to ensure static compatibility across distros.
+4.  **Environment Injection:**
+    *   Sets `$CC`, `$CXX` to `zig cc -target ...`.
+    *   Sets language-specific vars (`CGO_ENABLED`, `GOOS`, `CARGO_TARGET_..._LINKER`).
+    *   *Concurrency:* Wrapper scripts use `mktemp` to support multiple architectural builds in the same job without file collisions.
+
+### 2.3 Policy Enforcement
+**Rust + Musl Policy:**
+Zig bundles its own Musl libc, which often conflicts with Rust's bundled Musl CRT (duplicate symbols `_start`, `_init`).
+*   **Deny (Default):** Fail fast. Advise user to use `gnu` target or `cargo-zigbuild`.
+*   **Warn/Allow:** For adventurous users who want to link manually or rely on luck.
+
+## 3. Technical Rationale
+
+### 3.1 Why No Docker?
+Traditional cross-compilation uses Docker (e.g., `cross-rs`).
+*   **Problem:** Docker-in-Docker issues, slow volume mounts, permission hell, and poor support on macOS runners.
+*   **Solution:** Zig is a self-contained cross-compiler. It needs no external system headers or sysroots.
+
+### 3.2 The "Opinionated Environment"
+We do not attempt to merge with existing environment variables. We overwrite them.
+*   *Why?* If a user asks us to set up a cross-compiler, `CC` *must* be that cross-compiler. Merging behavior leads to debugging nightmares ("Which compiler did Make pick up?").
+*   *Philosophy:* If you want "helper" behavior, write a shell script. If you want "infrastructure", use this action.
+
+## 4. Future Roadmap (v3+)
+
+### 4.1 Enhanced Language Presets (`project-type`)
+Current presets are functional. Future iterations could interpret them more strictly:
+*   `type: c`: Only sets `$CC`/`$CXX`. Unsets `$CGO_ENABLED` to prevent accidental bleed.
+*   `type: rust`: Explicitly unsets Go-related vars.
+
+### 4.2 Verification Levels
+Currently, we verify basic file headers (ELF/PE/Mach-O).
+*   **Proposal:** Add `verify-level: precise`.
+*   *Mechanism:* Use `readelf`/`otool` to verify linked libc (ensure no glibc refs in static build) and architecture.
+
+### 4.3 macOS Host Verification
+We claim macOS support but primarily test on Linux.
+*   **Action:** Add a `macos-latest` job to E2E matrix targeting `macos-arm64` via C.
+
+### 4.4 Documentation as Spec
+*   Document patterns for CMake (`-DCMAKE_C_COMPILER=$CC`) and Autotools (`./configure`).
+*   Keep the action code simple; move complexity to documentation/examples.
+
+---
+
+**Summary:**
+This action is designed to be the foundational block for cross-compilation pipelines. It favors correctness over convenience and explicit configuration over magic.
