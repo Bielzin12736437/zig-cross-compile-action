@@ -9,9 +9,13 @@ inputs:
     description: 'Target architecture (e.g., linux-arm64, x86_64-linux-gnu)'
     required: true
   project-type:
-    description: 'Project type hint: c, rust, go'
+    description: 'Language preset (auto, go, rust, c, custom)'
     required: false
     default: 'auto'
+  rust-musl-mode:
+    description: 'Policy for Rust+Musl targets: deny (fail), warn (log), allow (silent-ish)'
+    required: false
+    default: 'deny'
   cmd:
     description: 'Build command to execute'
     required: true

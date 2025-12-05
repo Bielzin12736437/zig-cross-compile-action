@@ -10,6 +10,15 @@ Zig ships with its own libc and linker, allowing specific targets (like `linux-m
 > **Note**: macOS cross-compilation works for simple CLI binaries/libs. Full macOS apps requiring Apple Frameworks/SDKs still need a macOS runner.
 
 ## Usage
+This action follows the "Infrastructure, Not Helper" philosophy.
+**It does NOT:**
+- Install Rust or Go toolchains (use `dtolnay/rust-toolchain` or `actions/setup-go`).
+- Run `go mod init` or `rustup target add`.
+- Modify your project files.
+
+**It DOES:**
+- Install Zig.
+- Configure environment variables to force cross-compilation via `zig cc`.
 
 ### Go (CGO)
 Configuration `project-type: auto` enables CGO (`CGO_ENABLED=1`) for Linux/macOS targets automatically.
@@ -24,7 +33,7 @@ If you need a pure Go binary (no CGO), set `project-type: custom` or unset `CGO_
 
 ### Rust
 We configure the `CARGO_TARGET_..._LINKER` variables.
-**Note**: Only `*-gnu` targets (glibc) are fully supported. `*-musl` targets are experimental due to potential CRT conflicts between Zig and Rust's self-contained Musl.
+**Note**: `*-musl` targets are disabled by default due to CRT conflicts. To enable them (at your own risk), set `rust-musl-mode: warn` or `allow`.
 
 ```yaml
 - uses: dtolnay/rust-toolchain@stable
@@ -34,6 +43,7 @@ We configure the `CARGO_TARGET_..._LINKER` variables.
 - uses: ./zig-action
   with:
     target: aarch64-unknown-linux-gnu
+    rust-musl-mode: deny # default
     cmd: cargo build --release --target aarch64-unknown-linux-gnu
 ```
 
@@ -57,18 +67,26 @@ We configure the `CARGO_TARGET_..._LINKER` variables.
 ### Environment & Runners
 
 **Supported Runners:**
-- `ubuntu-latest` (Recommended)
-- `macos-latest`
-- `windows-latest` (Experimental, expect warnings)
+- `ubuntu-latest` (Tier 1 Support)
+- `macos-latest` (Tier 1 Support)
+- **Windows Runners**: NOT SUPPORTED. The action will fail immediately on Windows hosts.
 
-**Environment Variables:**
-This action is opinionated and will unconditionally overwrite the following variables in the job environment:
+**Verified Targets:**
+- `x86_64-linux-musl`, `aarch64-linux-musl`
+- `aarch64-unknown-linux-gnu`
+- `x86_64-windows-gnu`
+- `aarch64-macos`, `x86_64-macos`
+
+*Other compiled targets may work but are considered "best effort".*
+
+**Environment Variables ("Opinionated Environment"):**
+This action treats the build environment as its own domain. It will **unconditionally overwrite**:
 - `CC`, `CXX`, `AR`, `RANLIB`
 - `ZIG_TARGET`
-- `CGO_ENABLED`, `GOOS`, `GOARCH` (if project-type is go/auto)
-- `CARGO_TARGET_<TRIPLE>_LINKER` (if project-type is rust/auto)
+- `CGO_ENABLED`, `GOOS`, `GOARCH` (for Go projects)
+- `CARGO_TARGET_<TRIPLE>_LINKER`, `CC_<TRIPLE>`, `CXX_<TRIPLE>` (for Rust projects)
 
-To enable debug logging, set `ZIG_ACTION_DEBUG: 1` in your workflow environment.
+To enable debug logging, set `ZIG_ACTION_DEBUG: 1`.
 
 ### Aliases & Defaults
 We map convenience aliases to "safe defaults" (usually static Musl for Linux).

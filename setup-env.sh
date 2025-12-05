@@ -23,6 +23,10 @@ is_sourced() {
 # Logging helper
 if [[ "${ZIG_ACTION_DEBUG:-0}" == "1" ]]; then
     log() { echo "::debug::[zig-action] $1"; }
+    # Dump initial environment states for debugging
+    echo "::group::[zig-action] Debug Env Dump"
+    env | grep -E '^(ZIG|GO|CARGO|CC|CXX)' || true
+    echo "::endgroup::"
 else
     log() { echo "::notice::[zig-action] $1"; }
 fi
@@ -72,7 +76,7 @@ esac
 
 # 0. Platform & Input Checks
 if [[ "${RUNNER_OS:-Linux}" == "Windows" ]]; then
-    log "WARNING: Windows runners are not officially supported as host OS. Behavior may be unpredictable."
+    die "Windows runners are not supported as host OS. Use Ubuntu or macOS runners."
 fi
 
 # Project Type logic: strict validation (no accidental fallbacks)
@@ -159,10 +163,24 @@ if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
         log "Skipping Rust linker setup: target '$ZIG_TARGET' contains version suffix."
         log "To cross-compile Rust, use a target without glibc version (e.g. x86_64-linux-gnu)."
     else
-        # Optional warning for musl
+        # Rust + Musl Policy
         if [[ "$ZIG_TARGET" == *musl* ]]; then
-            log "WARNING: Rust with Musl targets is known to be flaky due to CRT conflicts (duplicate symbols)."
-            log "If the build fails, try switching to a glibc target (*-gnu) or set 'project-type: c' and use 'cargo-zigbuild'."
+            # INPUT_RUST_MUSL_MODE defaults to 'deny' in action.yml
+            RUST_MODE="${INPUT_RUST_MUSL_MODE:-deny}"
+            case "$RUST_MODE" in
+                deny)
+                    die "Rust+Musl targets are disabled by default (CRT conflicts). Use *-gnu target, cargo-zigbuild, or set rust-musl-mode: warn/allow."
+                    ;;
+                warn)
+                    log "WARNING: Rust with Musl targets is known to be flaky due to CRT conflicts."
+                    ;;
+                allow)
+                    log "NOTE: Rust+Musl enabled (mode: allow). Expect potential duplicate symbol errors."
+                    ;;
+                *)
+                    log "Unknown rust-musl-mode '$RUST_MODE', treating as 'warn'."
+                    ;;
+            esac
         fi
 
         # 1. Map Zig target to Rust triple
