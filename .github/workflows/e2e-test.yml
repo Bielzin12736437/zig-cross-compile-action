@@ -20,6 +20,15 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Initialize Go Module
+        run: |
+          cd examples/go-cgo
+          go mod init example/go-cgo
+          go mod tidy
+
+      - name: Create Dist Dir
+        run: mkdir -p dist
+
       - name: Build Go (CGO)
         uses: ./ # Uses local action
         with:
@@ -58,6 +67,9 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
+
+      - name: Create Dist Dir
+        run: mkdir -p dist
 
       - name: Build C (Direct CC)
         uses: ./
