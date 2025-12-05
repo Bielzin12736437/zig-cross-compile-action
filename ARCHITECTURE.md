@@ -5,34 +5,34 @@
 **Toolchain:** `zig cc`, `zig c++`
 
 ## 0. Context & Goals
-`zig-cross-compile-action` is a Docker-free toolchain injector for GitHub Actions. key capabilities in v2.2.0:
-
-*   **Zero Docker:** Runs directly on Linux/macOS runners.
-*   **Opinionated:** Unconditionally claims `CC`, `CXX`, `AR`, `RANLIB`.
-*   **Strict Policies:** Windows host is hard unsupported (fail). Rust+Musl is opt-in (default deny).
-*   **Smart Detection:** `project-type: auto` inspects repos (`Cargo.toml`, `go.mod`) to select the correct preset.
+`zig-cross-compile-action` is a Docker-free toolchain injector for GitHub Actions. **Current State (v2.3.0):**
+*   **Zero Docker:** Runs directly on the host runner (Linux/macOS).
+*   **Opinionated:** Unconditionally claims `$CC`, `$CXX`, `$AR`, `$RANLIB`.
+*   **Strict Policies:** Hard fail on Windows hosts; opt-in only for Rust+Musl.
+*   **Smart Automation:** Detects `Cargo.toml`/`go.mod` to apply correct environment policies.
 
 **Goals:**
-1.  **Transparency:** No hidden magic. Errors should be explicit.
+1.  **Transparency:** No hidden magic. Errors should be explicit and actionable.
 2.  **Performance:** Zero container overhead.
-3.  **Correctness:** Prefer hard failure over flaky "best effort" behavior.
+3.  **Correctness:** Prefer explicit failure over "best effort" behavior that breaks silently.
 
 ## 1. Scope & Boundaries
+To maintain maintainability and trust, we define strict boundaries.
 
 ### 1.1 In Scope
-*   Cross-compilation of C/C++ (`zig cc`), Go (CGO), and Rust (Zig linker).
-*   Mapping simple CI targets (`linux-arm64`) to Zig-compatible targets (`aarch64-linux-musl`).
-*   Injecting environment variables into the job.
+*   Cross-compiling C, C++, Rust, and Go binaries via Zig.
+*   Mapping strict aliases (e.g., `linux-arm64`) to Zig triples (`aarch64-linux-musl`).
+*   Injecting compiler environment variables into the GitHub Action job.
 
-### 1.2 Out of Scope / Non-Goals
-*   **Build Orchestration:** User provides the `cmd`. We do not run `go build`, `cargo build`, or `make`.
-*   **Toolchain Management:** User installs Go/Rust (e.g., `actions/setup-go`).
-*   **Windows Host Support:** Windows is supported as a *target*, not a *host*.
-*   **Project Mutation:** We never touch `Cargo.toml`, `go.mod`, or `.cargo/config`.
+### 1.2 Non-Goals
+*   **Build Orchestration:** We do not manage `go mod`, `cargo build`, or `make`. We provide the *compiler*; the user provides the *build command*.
+*   **Toolchain Management:** We do not install Rust (rustup) or Go. That is the user's responsibility.
+*   **Windows Host Support:** Bash on Windows (MSYS/Git Bash) is inconsistent. We only support Windows as a *target*, not a *host*.
+*   **Project Mutation:** We never touch `Cargo.toml`, `.cargo/config`, or source files.
 
-## 2. Architecture (v2.2.0)
+## 2. Architecture (v2.3.0)
 
-### 2.1 Action Interface (`action.yml`)
+### 2.1 Interface (`action.yml`)
 | Input | Description | Default |
 | :--- | :--- | :--- |
 | `version` | Zig version (via `setup-zig`) | `0.13.0` |
