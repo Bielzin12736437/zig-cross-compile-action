@@ -12,7 +12,7 @@ log() { echo "::notice::[zig-action] $1"; }
 die() { echo "::error::[zig-action] $1"; safe_exit 1; }
 
 # Guard against direct execution if sourced usage is expected, though for Github Actions
-# simply exiting is fine. For local dev usage, we return instead of exit if sourced.
+# simply exiting is fine.
 is_sourced() {
     if [ -n "${BASH_SOURCE-}" ] && [ "${BASH_SOURCE[0]}" != "${0}" ]; then
         return 0

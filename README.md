@@ -61,4 +61,6 @@ If you need **glibc** or specific versions, use the full Zig target triple (e.g.
 * `linux-arm64` -> `aarch64-linux-musl` (Static binary default)
 * `linux-x64`   -> `x86_64-linux-musl`
 * `macos-arm64` -> `aarch64-macos`
+* `macos-x64`   -> `x86_64-macos`
+* `windows-x64` -> `x86_64-windows-gnu`
 ```
