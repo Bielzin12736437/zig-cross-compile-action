@@ -38,7 +38,7 @@ runs:
       shell: bash
       run: |
         echo "Running cross-compilation for ${{ inputs.target }}..."
-        bash -c "${{ inputs.cmd }}"
+        ${{ inputs.cmd }}
 
     - name: Verify Output (Optional)
       shell: bash

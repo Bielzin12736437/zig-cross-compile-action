@@ -8,7 +8,8 @@ set -euo pipefail
 # If run directly by a developer, it will exit the shell unless guarded.
 
 log() { echo "::notice::[zig-action] $1"; }
-die() { echo "::error::[zig-action] $1"; exit 1; }
+# die uses safe_exit to respect sourced execution
+die() { echo "::error::[zig-action] $1"; safe_exit 1; }
 
 # Guard against direct execution if sourced usage is expected, though for Github Actions
 # simply exiting is fine. For local dev usage, we return instead of exit if sourced.
@@ -30,16 +31,16 @@ safe_exit() {
 
 TARGET="${INPUT_TARGET:-${1:-}}"
 TYPE="${INPUT_PROJECT_TYPE:-auto}"
+# Normalize TYPE to lowercase to avoid case-sensitivity issues
+TYPE=$(printf '%s' "${TYPE}" | tr '[:upper:]' '[:lower:]')
 
 if [[ -z "$TARGET" ]]; then
     die "Target is required. (inputs.target)"
-    safe_exit 1
 fi
 
 # Security: Sanitize target input
 if [[ ! "$TARGET" =~ ^[a-zA-Z0-9_\.-]+$ ]]; then
     die "Invalid characters in target string: '$TARGET'"
-    safe_exit 1
 fi
 
 # 1. Alias Resolution
