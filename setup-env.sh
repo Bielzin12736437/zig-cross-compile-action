@@ -13,22 +13,17 @@ if [[ "${ZIG_ACTION_DEBUG:-0}" == "1" ]]; then
     # Dump initial environment states for debugging
     echo "::group::[zig-action] Debug Env Dump"
     # Grep strictly for build-related env vars to avoid accidental secret leakage
-    env | grep -E '^(ZIG_|GO(OS|ARCH|FLAGS|ROOT)?=|CARGO_|CC=|CXX=)' || true
+    env | grep -E '^(ZIG_|GO(OS|ARCH|FLAGS|ROOT)?=|CARGO_(TARGET|HOME|TERM|INCREMENTAL|PROFILE|ENVDIR|BUILD)=|CC=|CXX=)' || true
     echo "::endgroup::"
 else
     log() { echo "::notice::[zig-action] $1"; }
 fi
 
-# die uses safe_exit to respect sourced execution
-die() { echo "::error::[zig-action] $1"; safe_exit 1; }
-
-# Safely handle exit/return based on execution mode
-safe_exit() {
-    if is_sourced; then
-        return "$1"
-    else
-        exit "$1"
-    fi
+# die: Fail fast.
+# CAUTION: If sourced locally, this WILL exit your shell session.
+die() {
+    echo "::error::[zig-action] $1"
+    exit 1
 }
 
 TARGET="${INPUT_TARGET:-${1:-}}"
@@ -70,15 +65,15 @@ fi
 # Project Type Resolution (Smart Auto)
 # If 'auto', we try to detect the language to avoid conflicting policies (e.g. running Rust checks on a Go project).
 if [[ "$TYPE" == "auto" ]]; then
-    if [[ -f "Cargo.toml" ]] || ls Cargo.toml >/dev/null 2>&1; then
+    if [[ -f "Cargo.toml" ]]; then
         TYPE="rust"
         log "Auto-detected Rust project (found Cargo.toml). Setting project-type='rust'."
-    elif [[ -f "go.mod" ]] || ls go.mod >/dev/null 2>&1; then
+    elif [[ -f "go.mod" ]]; then
         TYPE="go"
         log "Auto-detected Go project (found go.mod). Setting project-type='go'."
     else
         TYPE="c"
-        log "No Cargo.toml or go.mod found. Defaulting project-type='auto' to fallback 'c'."
+        log "No Cargo.toml or go.mod found. Auto-detected project-type='c'."
     fi
 fi
 
@@ -151,7 +146,7 @@ log "Target resolved: $ZIG_TARGET"
 # 4. Project-Specific Configs
 
 # Go: trivial, just set the vars if we know the OS/ARCH
-if [[ "$TYPE" == "go" || "$TYPE" == "auto" ]]; then
+if [[ "$TYPE" == "go" ]]; then
     if [[ -n "$GO_OS" && -n "$GO_ARCH" ]]; then
         export_var "CGO_ENABLED" "1"
         export_var "GOOS" "$GO_OS"
@@ -166,7 +161,7 @@ if [[ "$TYPE" == "c" ]]; then
 fi
 
 # Rust: annoying. Needs a wrapper script because cargo linker args can't handle spaces.
-if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
+if [[ "$TYPE" == "rust" ]]; then
     # Check for version suffix (e.g. .2.31) which breaks env var names
     if [[ "$ZIG_TARGET" == *.* ]]; then
         log "Skipping Rust linker setup: target '$ZIG_TARGET' contains version suffix."
