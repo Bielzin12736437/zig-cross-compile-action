@@ -133,16 +133,18 @@ if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
     if [[ "$ZIG_TARGET" == *.* ]]; then
         log "Skipping Rust linker setup: target '$ZIG_TARGET' contains version suffix."
         log "To cross-compile Rust, use a target without glibc version (e.g. x86_64-linux-gnu)."
-    elif [[ "$ZIG_TARGET" == *musl* ]]; then
-        log "WARNING: Rust with Musl targets is known to be flaky due to CRT conflicts (duplicate symbols)."
-        log "If the build fails, try switching to a glibc target (*-gnu) or set 'project-type: c' and use 'cargo-zigbuild'."
-        # We proceed anyway, but user is warned.
+    else
+        # Optional warning for musl
+        if [[ "$ZIG_TARGET" == *musl* ]]; then
+            log "WARNING: Rust with Musl targets is known to be flaky due to CRT conflicts (duplicate symbols)."
+            log "If the build fails, try switching to a glibc target (*-gnu) or set 'project-type: c' and use 'cargo-zigbuild'."
+        fi
 
         # 1. Map Zig target to Rust triple
         RUST_TRIPLE="$ZIG_TARGET"
         case "$RUST_TRIPLE" in
             *apple-darwin*|*unknown-linux-musl*|*unknown-linux-gnu*|*pc-windows-gnu*)
-                ;; # Already valid Rust triple
+                ;; # Already looks like a Rust triple
             *macos*)
                 RUST_TRIPLE="${RUST_TRIPLE/macos/apple-darwin}"
                 ;;
@@ -158,26 +160,26 @@ if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
         esac
 
         # 2. Variable sanitization
-        # CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER
         SANITIZED_TRIPLE=$(echo "$RUST_TRIPLE" | tr '-' '_')
         LINKER_VAR="CARGO_TARGET_$(echo "$SANITIZED_TRIPLE" | tr '[:lower:]' '[:upper:]')_LINKER"
 
-        # Create wrapper
+        # 3. Create wrapper
         WRAPPER_DIR="${RUNNER_TEMP:-/tmp}/zig-wrappers"
         mkdir -p "$WRAPPER_DIR"
         WRAPPER="$WRAPPER_DIR/cc-$ZIG_TARGET"
 
-        echo '#!/bin/sh' > "$WRAPPER"
-        echo "exec zig cc -target $ZIG_TARGET \"\$@\"" >> "$WRAPPER"
+        {
+            echo '#!/bin/sh'
+            echo "exec zig cc -target $ZIG_TARGET \"\$@\""
+        } > "$WRAPPER"
         chmod +x "$WRAPPER"
 
         export_var "$LINKER_VAR" "$WRAPPER"
-
-        # Set CC/CXX for the 'cc' crate
         export_var "CC_${SANITIZED_TRIPLE}" "$CC_CMD"
         export_var "CXX_${SANITIZED_TRIPLE}" "$CXX_CMD"
 
-        [[ "$TYPE" == "rust" ]] && log "Rust linker configured ($LINKER_VAR)"
+        # Log always to confirm it ran
+        log "Rust linker configured: $LINKER_VAR=$WRAPPER (RUST_TRIPLE=$RUST_TRIPLE)"
     fi
 fi
 
