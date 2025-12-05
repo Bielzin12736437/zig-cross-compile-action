@@ -237,4 +237,4 @@ if [[ "$TYPE" == "rust" ]]; then
 fi
 
 log "Environment configured successfully."
-safe_exit 0
+
