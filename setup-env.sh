@@ -160,6 +160,11 @@ if [[ "$TYPE" == "go" || "$TYPE" == "auto" ]]; then
     fi
 fi
 
+# C: Explicitly disable CGO to ensure pure C environment
+if [[ "$TYPE" == "c" ]]; then
+    export_var "CGO_ENABLED" "0"
+fi
+
 # Rust: annoying. Needs a wrapper script because cargo linker args can't handle spaces.
 if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
     # Check for version suffix (e.g. .2.31) which breaks env var names

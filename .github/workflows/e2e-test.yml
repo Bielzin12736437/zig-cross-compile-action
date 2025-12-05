@@ -87,3 +87,23 @@ jobs:
 
       - name: Verify C Binary
         run: file dist/app.exe | grep "PE32+"
+
+  test-c-macos:
+    name: C macos-arm64 (on macos-latest)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Create Dist Dir
+        run: mkdir -p dist
+
+      - name: Build C (Direct CC)
+        uses: ./
+        with:
+          target: aarch64-macos
+          project-type: c
+          cmd: $CC examples/c/main.c -o dist/app-macos
+
+      - name: Verify Mach-O Binary
+        run: file dist/app-macos | grep "Mach-O"

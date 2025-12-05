@@ -89,6 +89,24 @@ This action treats the build environment as its own domain. It will **unconditio
 
 To enable debug logging, set `ZIG_ACTION_DEBUG: 1`.
 
+### Integration Patterns
+Common build systems integration strategies:
+
+**CMake:**
+```bash
+cmake -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" ...
+```
+
+**Autotools (configure):**
+```bash
+./configure CC="$CC" CXX="$CXX" --host=$ZIG_TARGET
+```
+
+**Make:**
+```bash
+make CC="$CC" CXX="$CXX"
+```
+
 ### Aliases & Defaults
 We map convenience aliases to "safe defaults" (usually static Musl for Linux).
 If you need **glibc** or specific versions, use the full Zig target triple (e.g. `x86_64-linux-gnu.2.31`).
