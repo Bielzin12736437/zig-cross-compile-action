@@ -20,6 +20,16 @@ is_sourced() {
     return 1
 }
 
+# Logging helper
+if [[ "${ZIG_ACTION_DEBUG:-0}" == "1" ]]; then
+    log() { echo "::debug::[zig-action] $1"; }
+else
+    log() { echo "::notice::[zig-action] $1"; }
+fi
+
+# die uses safe_exit to respect sourced execution
+die() { echo "::error::[zig-action] $1"; safe_exit 1; }
+
 # Safely handle exit/return based on execution mode
 safe_exit() {
     if is_sourced; then
@@ -57,6 +67,21 @@ case "$TARGET" in
         ;;
     *pc-windows-gnu)
         TARGET="${TARGET/pc-windows-gnu/windows-gnu}"
+        ;;
+esac
+
+# 0. Platform & Input Checks
+if [[ "${RUNNER_OS:-Linux}" == "Windows" ]]; then
+    log "WARNING: Windows runners are not officially supported as host OS. Behavior may be unpredictable."
+fi
+
+# Project Type logic: strict validation (no accidental fallbacks)
+case "$TYPE" in
+    auto|go|rust|c|custom)
+        ;;
+    *)
+        log "WARNING: Unknown project-type '$TYPE'. Falling back to 'custom' (compiler injection only)."
+        TYPE="custom"
         ;;
 esac
 
@@ -163,10 +188,16 @@ if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
         SANITIZED_TRIPLE=$(echo "$RUST_TRIPLE" | tr '-' '_')
         LINKER_VAR="CARGO_TARGET_$(echo "$SANITIZED_TRIPLE" | tr '[:lower:]' '[:upper:]')_LINKER"
 
-        # 3. Create wrapper
+        # 3. Create wrapper (Concurrency-safe)
         WRAPPER_DIR="${RUNNER_TEMP:-/tmp}/zig-wrappers"
         mkdir -p "$WRAPPER_DIR"
-        WRAPPER="$WRAPPER_DIR/cc-$ZIG_TARGET"
+
+        # We use mktemp if available, otherwise fallback to simple path with PID
+        if command -v mktemp >/dev/null 2>&1; then
+            WRAPPER=$(mktemp "$WRAPPER_DIR/cc-$ZIG_TARGET-XXXXXX")
+        else
+            WRAPPER="$WRAPPER_DIR/cc-$ZIG_TARGET-$$"
+        fi
 
         {
             echo '#!/bin/sh'

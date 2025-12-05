@@ -45,14 +45,30 @@ We configure the `CARGO_TARGET_..._LINKER` variables.
     cmd: $CC main.c -o app.exe
 ```
 
-## Inputs
+### Inputs
 
-| Input | Description | Default |
-| :--- | :--- | :--- |
-| `target` | Zig target (e.g. `x86_64-linux-musl`) or alias | **Required** |
-| `cmd` | Command to run in the configured environment | **Required** |
-| `version` | Zig version (uses `goto-bus-stop/setup-zig`) | `0.13.0` |
-| `project-type` | `go`, `rust`, `c`, `auto`, or `custom` | `auto` |
+| Input | Description | Required | Default | Options |
+| :--- | :--- | :--- | :--- | :--- |
+| `version` | Zig version to install. | `false` | `0.13.0` | Any valid Zig version |
+| `target` | Target architecture. | `true` | - | e.g. `linux-arm64` |
+| `cmd` | Command to execute. | `true` | - | e.g. `go build ...` |
+| `project-type` | Language preset. | `false` | `auto` | `auto`, `go`, `rust`, `c`, `custom` |
+
+### Environment & Runners
+
+**Supported Runners:**
+- `ubuntu-latest` (Recommended)
+- `macos-latest`
+- `windows-latest` (Experimental, expect warnings)
+
+**Environment Variables:**
+This action is opinionated and will unconditionally overwrite the following variables in the job environment:
+- `CC`, `CXX`, `AR`, `RANLIB`
+- `ZIG_TARGET`
+- `CGO_ENABLED`, `GOOS`, `GOARCH` (if project-type is go/auto)
+- `CARGO_TARGET_<TRIPLE>_LINKER` (if project-type is rust/auto)
+
+To enable debug logging, set `ZIG_ACTION_DEBUG: 1` in your workflow environment.
 
 ### Aliases & Defaults
 We map convenience aliases to "safe defaults" (usually static Musl for Linux).
