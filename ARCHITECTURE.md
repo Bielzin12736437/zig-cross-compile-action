@@ -30,6 +30,12 @@ To maintain maintainability and trust, we define strict boundaries.
 *   **Windows Host Support:** Bash on Windows (MSYS/Git Bash) is inconsistent. We only support Windows as a *target*, not a *host*.
 *   **Project Mutation:** We never touch `Cargo.toml`, `.cargo/config`, or source files.
 
+### 1.3 Versioning Policy
+We adhere to Semantic Versioning.
+*   **v2 (Major):** Stable API. No breaking changes to inputs or core behavior.
+*   **v2.x (Minor):** New features (e.g., new targets, enhanced policies).
+*   **v2.x.y (Patch):** Bug fixes and internal logic improvements.
+
 ## 2. Architecture (v2.3.0)
 
 ### 2.1 Interface (`action.yml`)

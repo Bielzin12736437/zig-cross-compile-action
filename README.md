@@ -1,15 +1,60 @@
-# zig-cross-compile-action
+# Zig Cross-Compiler Action
 
-A composite GitHub Action for cross-compiling C, C++, Rust, and Go using Zig.
-No Docker containers required. Uses Zig's `cc` and `c++` as drop-in compilers, automatically configuring the required environment variables.
+![GitHub Release](https://img.shields.io/github/v/release/Rul1an/zig-cross-compile-action?style=flat-square)
+![License](https://img.shields.io/github/license/Rul1an/zig-cross-compile-action?style=flat-square)
 
-## Why
-Cross-compiling with Docker is slow and file-permissions are often broken. `cross-rs` is heavy.
-Zig ships with its own libc and linker, allowing specific targets (like `linux-musl` or simple `macos` binaries) to build on a standard runner.
+**Zig-based cross-compilation for C, C++, Rust, and Go.**
+Zero Docker. No heavy containers. Runs directly on `ubuntu-latest` or `macos-latest`.
 
-> **Note**: macOS cross-compilation works for simple CLI binaries/libs. Full macOS apps requiring Apple Frameworks/SDKs still need a macOS runner.
+### Key Features
+*   🚀 **Zero Dependencies**: Uses Zig's bundled `libc` and cross-linker.
+*   🛡️ **Secure by Default**: Strict input sanitization and production-hardened policies.
+*   ⚡ **Fast**: Runs native binaries, avoiding Docker volume/permission overhead.
+*   🦀 **Rust & Go Ready**: Smartly wires up `CGO` and `cargo` linkers.
 
-## Usage
+> [!NOTE]
+> This is an **Infrastructure** tool, not a helper wizard. It provides the compiler environment; you provide the build command.
+
+## Quick Start
+
+### Go (CGO)
+```yaml
+- uses: actions/setup-go@v5
+  with:
+    go-version: '1.22'
+
+- uses: Rul1an/zig-cross-compile-action@v2
+  with:
+    target: linux-arm64
+    project-type: go
+    cmd: go build -o dist/app-linux-arm64 ./cmd
+```
+
+### Rust
+```yaml
+- uses: dtolnay/rust-toolchain@stable
+  with:
+    targets: aarch64-unknown-linux-gnu
+
+- uses: Rul1an/zig-cross-compile-action@v2
+  with:
+    target: aarch64-unknown-linux-gnu
+    project-type: rust
+    cmd: cargo build --release --target aarch64-unknown-linux-gnu
+```
+
+### C/C++
+```yaml
+- uses: Rul1an/zig-cross-compile-action@v2
+  with:
+    target: x86_64-windows-gnu
+    project-type: c
+    cmd: $CC main.c -o app.exe
+```
+
+[Read Technical Design (ARCHITECTURE.md)](ARCHITECTURE.md) for deep internals.
+
+## Usage Guide
 This action follows the "Infrastructure, Not Helper" philosophy.
 **It does NOT:**
 - Install Rust or Go toolchains (use `dtolnay/rust-toolchain` or `actions/setup-go`).
