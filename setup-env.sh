@@ -4,8 +4,8 @@ set -euo pipefail
 # setup-env.sh
 # Handles target aliasing and environment variable exports for Zig cross-compilation.
 #
-# This script is intended to be SOURCED by the GitHub Action.
-# If run directly by a developer, it will exit the shell unless guarded.
+# This script is intended to be SOURCED by the GitHub Action in CI.
+# CAUTION: Sourcing this locally will enable 'set -euo pipefail' in your current shell.
 
 log() { echo "::notice::[zig-action] $1"; }
 # die uses safe_exit to respect sourced execution
@@ -112,36 +112,55 @@ fi
 
 # Rust: annoying. Needs a wrapper script because cargo linker args can't handle spaces.
 if [[ "$TYPE" == "rust" || "$TYPE" == "auto" ]]; then
-    # Rust target triple guess (often matches Zig target, but not always)
-    RUST_TRIPLE="${ZIG_TARGET/macos/apple-darwin}"
-    RUST_TRIPLE="${RUST_TRIPLE/linux-musl/unknown-linux-musl}"
-    RUST_TRIPLE="${RUST_TRIPLE/linux-gnu/unknown-linux-gnu}"
-    RUST_TRIPLE="${RUST_TRIPLE/windows-gnu/pc-windows-gnu}"
+    # Check for version suffix (e.g. .2.31) which breaks env var names
+    if [[ "$ZIG_TARGET" == *.* ]]; then
+        log "Skipping Rust linker setup: target '$ZIG_TARGET' contains version suffix."
+        log "To cross-compile Rust, use a target without glibc version (e.g. x86_64-linux-gnu)."
+    else
+        # 1. Map Zig target to Rust triple
+        # If it already looks like a Rust triple (unknown-linux-*), keep it.
+        # Otherwise, map standard Zig usage to Rust conventions.
+        RUST_TRIPLE="$ZIG_TARGET"
+        case "$RUST_TRIPLE" in
+            *apple-darwin*|*unknown-linux-musl*|*unknown-linux-gnu*|*pc-windows-gnu*)
+                ;; # Already valid Rust triple
+            *macos*)
+                RUST_TRIPLE="${RUST_TRIPLE/macos/apple-darwin}"
+                ;;
+            *linux-musl*)
+                RUST_TRIPLE="${RUST_TRIPLE/linux-musl/unknown-linux-musl}"
+                ;;
+            *linux-gnu*)
+                RUST_TRIPLE="${RUST_TRIPLE/linux-gnu/unknown-linux-gnu}"
+                ;;
+            *windows-gnu*)
+                RUST_TRIPLE="${RUST_TRIPLE/windows-gnu/pc-windows-gnu}"
+                ;;
+        esac
 
-    # Env var format: CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER
-    # replacing underscores can be tricky if the triple has them, but triples usually use hyphens.
-    SANITIZED_TRIPLE=$(echo "$RUST_TRIPLE" | tr '-' '_')
-    LINKER_VAR="CARGO_TARGET_$(echo "$SANITIZED_TRIPLE" | tr '[:lower:]' '[:upper:]')_LINKER"
+        # 2. Variable sanitization
+        # CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER
+        SANITIZED_TRIPLE=$(echo "$RUST_TRIPLE" | tr '-' '_')
+        LINKER_VAR="CARGO_TARGET_$(echo "$SANITIZED_TRIPLE" | tr '[:lower:]' '[:upper:]')_LINKER"
 
-    # Create the wrapper
-    WRAPPER_DIR="${RUNNER_TEMP:-/tmp}/zig-wrappers"
-    mkdir -p "$WRAPPER_DIR"
-    WRAPPER="$WRAPPER_DIR/cc-$ZIG_TARGET"
+        # Create wrapper
+        WRAPPER_DIR="${RUNNER_TEMP:-/tmp}/zig-wrappers"
+        mkdir -p "$WRAPPER_DIR"
+        WRAPPER="$WRAPPER_DIR/cc-$ZIG_TARGET"
 
-    # We use $@ to pass through all args from cargo to zig cc
-    echo '#!/bin/sh' > "$WRAPPER"
-    echo "exec zig cc -target $ZIG_TARGET \"\$@\"" >> "$WRAPPER"
-    chmod +x "$WRAPPER"
+        echo '#!/bin/sh' > "$WRAPPER"
+        echo "exec zig cc -target $ZIG_TARGET \"\$@\"" >> "$WRAPPER"
+        chmod +x "$WRAPPER"
 
-    export_var "$LINKER_VAR" "$WRAPPER"
+        export_var "$LINKER_VAR" "$WRAPPER"
 
-    # Set CC/CXX for the 'cc' crate (used by many sys crates)
-    export_var "CC_${SANITIZED_TRIPLE}" "$CC_CMD"
-    export_var "CXX_${SANITIZED_TRIPLE}" "$CXX_CMD"
+        # Set CC/CXX for the 'cc' crate
+        export_var "CC_${SANITIZED_TRIPLE}" "$CC_CMD"
+        export_var "CXX_${SANITIZED_TRIPLE}" "$CXX_CMD"
 
-    [[ "$TYPE" == "rust" ]] && log "Rust linker configured ($LINKER_VAR)"
+        [[ "$TYPE" == "rust" ]] && log "Rust linker configured ($LINKER_VAR)"
+    fi
 fi
 
 log "Environment configured successfully."
 safe_exit 0
-

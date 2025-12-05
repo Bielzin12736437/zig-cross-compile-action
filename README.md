@@ -1,7 +1,7 @@
 # zig-cross-compile-action
 
-A composite GitHub Action to cross-compile C/C++, Rust, and Go using Zig.
-Sets up `zig cc` as the linker/compiler, handling the messy environment variable overrides for you.
+A composite GitHub ActiZero-docker cross-compilation for C, C++, Rust, and Go using Zig.
+No containers required. Uses Zig's `cc` and `c++` toolchain for hermetic, fast builds.er, handling the messy environment variable overrides for you.
 
 ## Why
 Cross-compiling with Docker is slow and file-permissions are often broken. `cross-rs` is heavy.
@@ -50,7 +50,7 @@ We configure the `CARGO_TARGET_..._LINKER` variables.
 | `target` | Zig target (e.g. `x86_64-linux-musl`) or alias | **Required** |
 | `cmd` | Command to run in the configured environment | **Required** |
 | `version` | Zig version (uses `goto-bus-stop/setup-zig`) | `0.13.0` |
-| `project-type` | Controls env setup (`go`, `rust`, `c`, `auto`) | `auto` |
+| `project-type` | `go`, `rust`, `c`, `auto`, or `custom` | `auto` |
 
 ### Aliases & Defaults
 We map convenience aliases to "safe defaults" (usually static Musl for Linux).
