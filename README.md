@@ -3,148 +3,192 @@
 ![GitHub Release](https://img.shields.io/github/v/release/Rul1an/zig-cross-compile-action?style=flat-square)
 ![License](https://img.shields.io/github/license/Rul1an/zig-cross-compile-action?style=flat-square)
 
-**Zig-based cross-compilation for C, C++, Rust, and Go.**
-Zero Docker. No heavy containers. Runs directly on `ubuntu-latest` or `macos-latest`.
+Docker-free cross-compilation for C, C++, Rust, and Go using Zig’s `cc` / `c++` toolchain.
+Turn a standard GitHub Actions runner into a cross-compiling build host — no containers, sysroots, or system headers required.
 
-### Key Features
-*   🚀 **Zero Dependencies**: Uses Zig's bundled `libc` and cross-linker.
-*   🛡️ **Secure by Default**: Strict input sanitization and production-hardened policies.
-*   ⚡ **Fast**: Runs native binaries, avoiding Docker volume/permission overhead.
-*   🦀 **Rust & Go Ready**: Smartly wires up `CGO` and `cargo` linkers.
+---
 
-> [!NOTE]
-> This is an **Infrastructure** tool, not a helper wizard. It provides the compiler environment; you provide the build command.
+## What this Action does
 
-## Quick Start
+This Action configures **Zig** as a drop-in cross-compiler:
 
-### Go (CGO)
+- Installs Zig (via `goto-bus-stop/setup-zig`).
+- Sets `CC`, `CXX`, `AR`, `RANLIB` to use `zig cc` / `zig c++` with the requested target.
+- Configures language-specific environment:
+  - Go: `CGO_ENABLED`, `GOOS`, `GOARCH`
+  - Rust: `CARGO_TARGET_..._LINKER` + `CC_<TRIPLE>`, `CXX_<TRIPLE>`
+- Optionally verifies output artifacts with a lightweight `file` scan.
+
+This Action is **infrastructure**, not a helper script:
+
+- ✅ It **does** install Zig and configure the environment for cross-compilation.
+- ❌ It **does not** run `go build`, `cargo build`, `make`, or modify your project files.
+- ❌ It **does not** install Go or Rust toolchains for you.
+
+You stay in control of your build commands; the Action guarantees the compiler side is correct.
+
+---
+
+## Features
+
+- **No Docker required**
+  Avoids nested Docker, slow volume mounts, permission issues, and platform quirks. Runs directly on `ubuntu-latest` and `macos-latest`.
+
+- **Opinionated environment**
+  The Action **unconditionally overwrites**:
+  - `CC`, `CXX`, `AR`, `RANLIB`
+  - `ZIG_TARGET`
+  - `CGO_ENABLED`, `GOOS`, `GOARCH` (for Go)
+  - `CARGO_TARGET_<TRIPLE>_LINKER`, `CC_<TRIPLE>`, `CXX_<TRIPLE>` (for Rust)
+
+- **Simple target aliases**
+  Human-friendly targets mapped to Zig triples:
+  - `linux-arm64` → `aarch64-linux-musl` (static, musl)
+  - `linux-x64` → `x86_64-linux-musl`
+  - `macos-arm64` → `aarch64-macos`
+  - `macos-x64` → `x86_64-macos`
+  - `windows-x64` → `x86_64-windows-gnu`
+
+- **Strict Rust+Musl policy**
+  Rust’s bundled Musl CRT and Zig’s Musl can conflict.
+  This Action **denies Musl Rust targets by default**, with an explicit opt-out:
+
+  ```yaml
+  rust-musl-mode: deny  # default
+  # or: warn / allow
+  ```
+
+- **Debug mode**
+  Set `ZIG_ACTION_DEBUG: 1` to get extra logging about the configured environment.
+
+## Inputs
+
+| Input | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `version` | no | `0.13.0` | Zig version to install via setup-zig. |
+| `target` | yes | — | Target architecture / triple or alias (e.g. `linux-arm64`). |
+| `project-type` | no | `auto` | Preset: `auto`, `go`, `rust`, `c`, `custom`. |
+| `rust-musl-mode` | no | `deny` | Rust+Musl policy: `deny`, `warn`, or `allow`. |
+| `verify-level` | no | `basic` | Post-build verification: `basic` (file check) or `none`. |
+| `cmd` | yes | — | Build command to run in the configured environment. |
+
+### `project-type` presets
+
+*   `auto`: Detects language based on files in the repository root:
+    *   `Cargo.toml` → Rust
+    *   `go.mod` → Go
+    *   otherwise → C
+*   `go`: Configure Go + CGO only.
+*   `rust`: Configure Rust linker/wrappers only.
+*   `c`: Pure C/C++: set `CC`, `CXX`, explicitly `CGO_ENABLED=0`.
+*   `custom`: Only injects compiler-related env vars; no language-specific tweaks.
+
+## Supported Runners & Targets
+
+**Host Runners (where the Action runs):**
+*   ✅ `ubuntu-latest` (Tier 1)
+*   ✅ `macos-latest` (Tier 1)
+*   ❌ **Windows runners are not supported as hosts** (The Action will fail fast on `RUNNER_OS == Windows`).
+
+**Verified Target Examples:**
+*   Linux (musl): `x86_64-linux-musl`, `aarch64-linux-musl`
+*   Linux (glibc): `aarch64-unknown-linux-gnu`
+*   Windows (target): `x86_64-windows-gnu`
+*   macOS (target): `aarch64-macos`, `x86_64-macos`
+
+*Other Zig-supported targets may work but are considered best effort.*
+
+## Usage Examples
+
+### 1. Go (CGO) → Linux ARM64
 ```yaml
-- uses: actions/setup-go@v5
-  with:
-    go-version: '1.22'
+jobs:
+  build-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-- uses: Rul1an/zig-cross-compile-action@v2
-  with:
-    target: linux-arm64
-    project-type: go
-    cmd: go build -o dist/app-linux-arm64 ./cmd
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build Go (CGO) for linux-arm64
+        uses: Rul1an/zig-cross-compile-action@v2
+        with:
+          target: linux-arm64           # → aarch64-linux-musl
+          project-type: go
+          cmd: |
+            go build -o dist/app-go-arm64 ./cmd
 ```
 
-### Rust
+### 2. Rust → aarch64-unknown-linux-gnu
 ```yaml
-- uses: dtolnay/rust-toolchain@stable
-  with:
-    targets: aarch64-unknown-linux-gnu
+jobs:
+  build-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-- uses: Rul1an/zig-cross-compile-action@v2
-  with:
-    target: aarch64-unknown-linux-gnu
-    project-type: rust
-    cmd: cargo build --release --target aarch64-unknown-linux-gnu
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Build Rust with Zig linker
+        uses: Rul1an/zig-cross-compile-action@v2
+        with:
+          target: aarch64-unknown-linux-gnu
+          project-type: rust
+          rust-musl-mode: deny
+          cmd: |
+            cargo build --release --target aarch64-unknown-linux-gnu
 ```
 
-### C/C++
+### 3. C → Windows x64 (from Linux runner)
 ```yaml
-- uses: Rul1an/zig-cross-compile-action@v2
-  with:
-    target: x86_64-windows-gnu
-    project-type: c
-    cmd: $CC main.c -o app.exe
+jobs:
+  build-c-win:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build C for Windows
+        uses: Rul1an/zig-cross-compile-action@v2
+        with:
+          target: windows-x64          # → x86_64-windows-gnu
+          project-type: c
+          cmd: $CC src/main.c -o dist/app.exe
 ```
 
-[Read Technical Design (ARCHITECTURE.md)](ARCHITECTURE.md) for deep internals.
-
-## Usage Guide
-This action follows the "Infrastructure, Not Helper" philosophy.
-**It does NOT:**
-- Install Rust or Go toolchains (use `dtolnay/rust-toolchain` or `actions/setup-go`).
-- Run `go mod init` or `rustup target add`.
-- Modify your project files.
-
-**It DOES:**
-- Install Zig.
-- Configure environment variables to force cross-compilation via `zig cc`.
-
-### Go (CGO)
-Configuration `project-type: auto` enables CGO (`CGO_ENABLED=1`) for Linux/macOS targets automatically.
-If you need a pure Go binary (no CGO), set `project-type: custom` or unset `CGO_ENABLED` manually.
-
+### 4. C → macOS ARM64 (from macos-latest runner)
 ```yaml
-- uses: ./zig-action
-  with:
-    target: linux-arm64
-    cmd: go build -o dist/app ./cmd
+jobs:
+  build-c-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build C for macOS ARM64
+        uses: Rul1an/zig-cross-compile-action@v2
+        with:
+          target: aarch64-macos
+          project-type: c
+          cmd: $CC src/main.c -o dist/app-macos
 ```
 
-### Rust
-We configure the `CARGO_TARGET_..._LINKER` variables.
-**Note**: `*-musl` targets are disabled by default due to CRT conflicts. To enable them (at your own risk), set `rust-musl-mode: warn` or `allow`.
+## Integration Patterns
 
-```yaml
-- uses: dtolnay/rust-toolchain@stable
-  with:
-    targets: aarch64-unknown-linux-gnu
-
-- uses: ./zig-action
-  with:
-    target: aarch64-unknown-linux-gnu
-    rust-musl-mode: deny # default
-    cmd: cargo build --release --target aarch64-unknown-linux-gnu
-```
-
-### C/C++
-```yaml
-- uses: ./zig-action
-  with:
-    target: windows-x64
-    cmd: $CC main.c -o app.exe
-```
-
-### Inputs
-
-| Input | Description | Required | Default | Options |
-| :--- | :--- | :--- | :--- | :--- |
-| `version` | Zig version to install. | `false` | `0.13.0` | Any valid Zig version |
-| `target` | Target architecture. | `true` | - | e.g. `linux-arm64` |
-| `cmd` | Command to execute. | `true` | - | e.g. `go build ...` |
-| `project-type` | Language preset. | `false` | `auto` | `auto`, `go`, `rust`, `c`, `custom` |
-| `rust-musl-mode` | Policy for Rust+Musl. | `false` | `deny` | `deny`, `warn`, `allow` |
-
-### Environment & Runners
-
-**Supported Runners:**
-- `ubuntu-latest` (Tier 1 Support)
-- `macos-latest` (Tier 1 Support)
-- **Windows Runners**: NOT SUPPORTED. The action will fail immediately on Windows hosts.
-
-**Verified Targets:**
-- `x86_64-linux-musl`, `aarch64-linux-musl`
-- `aarch64-unknown-linux-gnu`
-- `x86_64-windows-gnu`
-- `aarch64-macos`, `x86_64-macos`
-
-*Other compiled targets may work but are considered "best effort".*
-
-**Environment Variables ("Opinionated Environment"):**
-This action treats the build environment as its own domain. It will **unconditionally overwrite**:
-- `CC`, `CXX`, `AR`, `RANLIB`
-- `ZIG_TARGET`
-- `CGO_ENABLED`, `GOOS`, `GOARCH` (for Go projects)
-- `CARGO_TARGET_<TRIPLE>_LINKER`, `CC_<TRIPLE>`, `CXX_<TRIPLE>` (for Rust projects)
-
-To enable debug logging, set `ZIG_ACTION_DEBUG: 1`.
-
-### Integration Patterns
-Common build systems integration strategies:
+You can combine this Action with common build systems by reusing `$CC`, `$CXX`:
 
 **CMake:**
 ```bash
-cmake -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" ...
+cmake -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" .
+cmake --build .
 ```
 
-**Autotools (configure):**
+**Autotools:**
 ```bash
-./configure CC="$CC" CXX="$CXX" --host=$ZIG_TARGET
+./configure CC="$CC" CXX="$CXX" --host="$ZIG_TARGET"
+make
 ```
 
 **Make:**
@@ -152,39 +196,53 @@ cmake -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" ...
 make CC="$CC" CXX="$CXX"
 ```
 
-```bash
-make CC="$CC" CXX="$CXX"
-```
+## Monorepos
 
-### Monorepo Usage
-`project-type: auto` only checks the repository root. For monorepos:
-1. Set `project-type: rust` or `go` explicitly.
-2. Or use `working-directory` in your job steps.
+`project-type: auto` only inspects the current working directory (typically repo root):
 
+If your Go/Rust project lives in a subdirectory (e.g. `services/api`), either:
+1.  Set `project-type` explicitly (`go` / `rust` / `c`), or
+2.  Adjust your workflow `working-directory` and `cmd` accordingly.
+
+**Example:**
 ```yaml
-- uses: ./zig-action
-  with:
-    project-type: rust
-    cmd: cd services/my-service && cargo build --release
+defaults:
+  run:
+    working-directory: services/rust-api
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: dtolnay/rust-toolchain@stable
+  - uses: Rul1an/zig-cross-compile-action@v2
+    with:
+      target: aarch64-unknown-linux-gnu
+      project-type: rust
+      cmd: cargo build --release --target aarch64-unknown-linux-gnu
 ```
 
-### Caching (Optional)
-This action is cache-agnostisch. To speed up builds, use `actions/cache`:
+## Optional: Zig Caching
+
+The Action itself is cache-agnostic, but you can speed up CI by caching Zig’s local data:
 
 ```yaml
 - uses: actions/cache@v4
   with:
     path: ~/.cache/zig
-    key: zig-${{ runner.os }}-${{ inputs.target }}
+    key: zig-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}
+    restore-keys: |
+      zig-${{ inputs.version }}-${{ runner.os }}-
+      zig-${{ inputs.version }}-
 ```
 
-### Aliases & Defaults
-We map convenience aliases to "safe defaults" (usually static Musl for Linux).
-If you need **glibc** or specific versions, use the full Zig target triple (e.g. `x86_64-linux-gnu.2.31`).
+## Debugging
 
-* `linux-arm64` -> `aarch64-linux-musl` (Static binary default)
-* `linux-x64`   -> `x86_64-linux-musl`
-* `macos-arm64` -> `aarch64-macos`
-* `macos-x64`   -> `x86_64-macos`
-* `windows-x64` -> `x86_64-windows-gnu`
-```
+Set `ZIG_ACTION_DEBUG: 1` to enable verbose logging:
+*   Initial relevant environment (`ZIG_*`, `GO*`, `CARGO_*`, `CC`, `CXX`).
+*   Resolved `ZIG_TARGET`.
+*   Rust triple + configured `CARGO_TARGET_*_LINKER` (when applicable).
+
+This makes it easier to diagnose misconfigured targets or unexpected toolchain behavior.
+
+---
+
+If you want deterministic, Docker-free cross-compilation with minimal configuration, this Action gives you a clean, opinionated foundation for your CI pipelines.
