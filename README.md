@@ -101,6 +101,7 @@ You stay in control of your build commands; the Action guarantees the compiler s
 ## Usage Examples
 
 ### 1. Go (CGO) → Linux ARM64
+[View Example Code](examples/go-cgo)
 ```yaml
 jobs:
   build-go:
@@ -122,6 +123,7 @@ jobs:
 ```
 
 ### 2. Rust → aarch64-unknown-linux-gnu
+[View Example Code](examples/rust-aarch64)
 ```yaml
 jobs:
   build-rust:
@@ -144,6 +146,7 @@ jobs:
 ```
 
 ### 3. C → Windows x64 (from Linux runner)
+[View Example Code](examples/c-windows)
 ```yaml
 jobs:
   build-c-win:
@@ -160,6 +163,7 @@ jobs:
 ```
 
 ### 4. C → macOS ARM64 (from macos-latest runner)
+[View Example Code](examples/c-macos)
 ```yaml
 jobs:
   build-c-macos:

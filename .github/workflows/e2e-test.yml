@@ -62,11 +62,11 @@ jobs:
           target: aarch64-unknown-linux-gnu
           project-type: rust
           cmd: |
-            cd examples/rust
+            cd examples/rust-aarch64
             cargo build --release --target aarch64-unknown-linux-gnu
 
       - name: Verify Rust Binary
-        run: file examples/rust/target/aarch64-unknown-linux-gnu/release/rust_cross | grep "ARM aarch64"
+        run: file examples/rust-aarch64/target/aarch64-unknown-linux-gnu/release/rust_cross | grep "ARM aarch64"
 
   test-c-windows:
     name: C windows-x64
@@ -83,7 +83,7 @@ jobs:
         with:
           target: windows-x64
           project-type: c
-          cmd: $CC examples/c/main.c -o dist/app.exe
+          cmd: $CC examples/c-windows/main.c -o dist/app.exe
 
       - name: Verify C Binary
         run: file dist/app.exe | grep "PE32+"
@@ -103,7 +103,7 @@ jobs:
         with:
           target: aarch64-macos
           project-type: c
-          cmd: $CC examples/c/main.c -o dist/app-macos
+          cmd: $CC examples/c-macos/main.c -o dist/app-macos
 
       - name: Verify Mach-O Binary
         run: file dist/app-macos | grep "Mach-O"
