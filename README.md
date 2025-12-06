@@ -256,9 +256,11 @@ steps:
 
 ## Performance & Caching ⚡️
 
-By default, `zig-cross-compile-action` is stateless: each job installs Zig and recompiles the standard libraries / CRTs it needs. For small projects this is fine; for larger ones it can add tens of seconds of overhead per job.
+By default, `zig-cross-compile-action` is stateless: each job installs Zig and recompiles the standard libraries / CRTs it needs.
 
-If you run on GitHub-hosted runners, you can reuse Zig’s **global compilation cache** between jobs using `actions/cache@v4`.
+**Honest Note:** On small projects, you will see little difference. However, for larger repositories and **multi-target builds**, reuse of the toolchain state (`~/.cache/zig`) significantly reduces overhead.
+
+If you run on GitHub-hosted runners, you can enable this using `actions/cache@v4`.
 
 ### Recommended cache snippet (Zig toolchain state)
 
