@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.1] – Documentation & Test Fixes
+
+**Fixed**
+- **Validation Suite:** Added missing `dist/` creation for Go job and fixed a typo in the Rust verification step.
+- **Documentation:** Restructured `ARCHITECTURE.md` to have a dedicated "Rust + Musl Policy" section, moving the `allow` caveat out of the Host Validation section.
+
 ## [2.5.0] – Validation & Tiers
 
 **Added**
