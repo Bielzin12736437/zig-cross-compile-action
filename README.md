@@ -88,7 +88,7 @@ You stay in control of your build commands; the Action guarantees the compiler s
 | `target` | yes | — | Target architecture / triple or alias (e.g. `linux-arm64`). |
 | `project-type` | no | `auto` | Preset: `auto`, `go`, `rust`, `c`, `custom`. |
 | `rust-musl-mode` | no | `deny` | Rust+Musl policy: `deny`, `warn`, or `allow`. |
-| `verify-level` | no | `basic` | Post-build verification: `basic` (file check) or `none`. |
+| `verify-level` | no | `basic` | Post-build verification: `basic` (soft file check) or `none`. |
 | `cmd` | yes | — | Build command to run in the configured environment. |
 
 ### `project-type` presets
@@ -101,6 +101,15 @@ You stay in control of your build commands; the Action guarantees the compiler s
 *   `rust`: Configure Rust linker/wrappers only.
 *   `c`: Pure C/C++: set `CC`, `CXX`, explicitly `CGO_ENABLED=0`.
 *   `custom`: Only injects compiler-related env vars; no language-specific tweaks.
+
+### `verify-level`
+
+Post-build verification of output binaries:
+
+*   `basic` (default): Scans for ELF/Mach-O/PE32 binaries using `file`. If none are found, it logs a message but **does not fail the build**.
+*   `none`: Skips this check entirely.
+
+This is a lightweight sanity check ("did I produce a real binary?"), not a comprehensive security verification.
 
 ## Supported Runners & Targets
 

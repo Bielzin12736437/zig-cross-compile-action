@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded C-matrix in E2E (more Tier-1 targets).
 - Potential second Action specifically for Zig installation (TypeScript/Node-based).
 
+**Added**
+- **Local Development Guide:** Added `CONTRIBUTING.md` with a "Paved Road" guide for running CI locally using `act`.
+- **Local CI Script:** Added `scripts/local-ci.sh` helper to simplify running validation jobs locally (auto-configures architecture emulation).
+- **Verify Level Documentation:** Clarified `verify-level` behavior (soft check) in `README.md`.
+
+**Changed**
+- **Go Version Sync:** Downgraded `examples/go-cgo` to Go 1.23 to match the validation workflow.
+- **Docs:** Refined `README.md` performance section with honest caching framing.
+
 ---
 
 ## [Unreleased]

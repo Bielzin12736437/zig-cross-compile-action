@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-Please report security issues via email to `maintainer@example.com` or open a GitHub Issue with the label `security`.
+Please report security issues via email to `info@logvault.eu` or open a GitHub Issue with the label `security`.
 
 We take all security reports seriously and will investigate and respond.
 

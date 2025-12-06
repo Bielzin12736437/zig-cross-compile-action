@@ -167,6 +167,9 @@ fi
 # Rust: annoying. Needs a wrapper script because cargo linker args can't handle spaces.
 if [[ "$TYPE" == "rust" ]]; then
     # Check for version suffix (e.g. .2.31) which breaks env var names
+    # Zig targets with explicit glibc versions (e.g. x86_64-linux-gnu.2.17)
+    # cannot be cleanly mapped to a CARGO_TARGET_..._LINKER env var.
+    # We skip Rust wiring for such targets; the user must use a standard triple (e.g. x86_64-linux-gnu).
     if [[ "$ZIG_TARGET" == *.* ]]; then
         log "Skipping Rust linker setup: target '$ZIG_TARGET' contains version suffix."
         log "To cross-compile Rust, use a target without glibc version (e.g. x86_64-linux-gnu)."
