@@ -107,3 +107,45 @@ jobs:
 
       - name: Verify Mach-O Binary
         run: file dist/app-macos | grep "Mach-O"
+  test-c-linux-matrix:
+    name: C (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-gnu
+            target: x86_64-linux-gnu
+            example-dir: c-linux-gnu
+          - name: linux-musl
+            target: x86_64-linux-musl
+            example-dir: c-linux-musl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build C example (${{ matrix.name }})
+        uses: ./
+        with:
+          target: ${{ matrix.target }}
+          project-type: c
+          cmd: |
+            cd examples/${{ matrix.example-dir }}
+            mkdir -p dist
+            $CC main.c -o dist/app
+
+      - name: Verify binary type (${{ matrix.name }})
+        run: |
+          file examples/${{ matrix.example-dir }}/dist/app
+          # Basic check: 64-bit ELF
+          file examples/${{ matrix.example-dir }}/dist/app | grep "ELF 64-bit LSB" >/dev/null
+
+          # Optional: distinguish glibc vs musl (static)
+          if [[ "${{ matrix.target }}" == "x86_64-linux-musl" ]]; then
+            echo "Checking for statically linked (musl) binary..."
+            file examples/${{ matrix.example-dir }}/dist/app | grep -i "statically linked" >/dev/null
+          fi
+
+      - name: Smoke test binary (${{ matrix.name }})
+        run: |
+          ./examples/${{ matrix.example-dir }}/dist/app
