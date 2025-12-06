@@ -269,3 +269,7 @@ This makes it easier to diagnose misconfigured targets or unexpected toolchain b
 ---
 
 If you want deterministic, Docker-free cross-compilation with minimal configuration, this Action gives you a clean, opinionated foundation for your CI pipelines.
+
+## Further reading
+
+Read the story behind this Action: [Cross-compile anything to anywhere with one GitHub Action](https://dev.to/rul1an/cross-compile-anything-to-anywhere-with-one-github-actionwhy-i-ended-up-building-this-2b62) on Dev.to.
