@@ -1,72 +1,65 @@
 # Supported Targets
 
-Dit document beschrijft welke targets expliciet ondersteund en getest worden door
-`zig-cross-compile-action`, en hoe strikt die support is.
+This document describes which targets are explicitly supported and tested by `zig-cross-compile-action`, and the level of support provided.
 
-We verdelen targets in drie “tiers”:
+We categorize targets into three “tiers”:
 
 - **Tier 1 – Verified:**
-  Worden automatisch getest in de E2E-workflow. Verwacht dat deze combinaties stabiel werken.
+  Automatically tested in the E2E workflow. These combinations are expected to work reliably.
 - **Tier 2 – Expected:**
-  Worden niet in elke commit getest, maar zijn bekende en courante Zig-targets die in de praktijk
-  goed werken. Issues zijn mogelijk; PR’s welkom.
+  Not tested in every commit but are known, common Zig targets that work well in practice. Issues are possible; PRs welcome.
 - **Tier 3 – Best effort / exotic:**
-  Door Zig ondersteund, maar niet door deze Action actief getest. Gebruik op eigen risico.
+  Supported by Zig but not actively tested by this Action. Use at your own risk.
 
-> Let op: deze Action ondersteunt **alleen Linux en macOS als host**.
-> Windows is alleen ondersteund als *target*, niet als *runner*.
+> Note: This Action supports **only Linux and macOS as hosts**.
+> Windows is supported only as a *target*, not as a *runner*.
 
 ---
 
 ## Tier 1 – Verified in CI
 
-Deze targets worden bouwtechnisch gevalideerd in `.github/workflows/e2e-test.yml`.
+These targets are validated in the `.github/workflows/e2e-test.yml` workflow.
 
-| Target triple                 | Alias          | Host runner     | Taal / Use case            | Status      |
+| Target triple                 | Alias          | Host runner     | Language / Use case        | Status      |
 | ---------------------------- | -------------- | --------------- | -------------------------- | ----------- |
 | `aarch64-linux-musl`         | `linux-arm64`  | `ubuntu-latest` | Go (CGO) cross-build       | ✅ Verified |
 | `aarch64-unknown-linux-gnu`  | —              | `ubuntu-latest` | Rust cross-build           | ✅ Verified |
 | `x86_64-windows-gnu`         | `windows-x64`  | `ubuntu-latest` | C → Windows PE64           | ✅ Verified |
 | `aarch64-macos`              | `macos-arm64`  | `macos-latest`  | C → macOS ARM64 (Mach-O)   | ✅ Verified |
 
-**Garanties:**
+**Guarantees:**
 
-- Deze combinaties worden in de E2E-workflow gebouwd én via `file` gecontroleerd op de juiste
-  architectuur / binary type.
-- Regressies op deze targets worden als **bugs** gezien en bij voorkeur in een patchrelease
-  opgelost.
+- These combinations are built in the E2E workflow and verified via `file` for correct architecture/binary type.
+- Regressions on these targets are considered **bugs** and preferably resolved in a patch release.
 
 ---
 
 ## Tier 2 – Expected to work
 
-Targets die sterk lijken op Tier 1, of door Zig goed ondersteund worden, maar nog niet expliciet
-in de E2E-matrix zitten.
+Targets that closely resemble Tier 1, or are well-supported by Zig, but are not explicitly in the E2E matrix.
 
-| Target triple                 | Mogelijke alias     | Verwacht host        | Opmerkingen                                                   |
+| Target triple                 | Possible alias      | Expected host        | Notes                                                         |
 | ---------------------------- | ------------------- | -------------------- | ------------------------------------------------------------- |
-| `x86_64-linux-musl`          | `linux-x64`         | `ubuntu-latest`      | Statisch Linux x64, ideaal voor “glue-free” distributables.  |
-| `x86_64-linux-gnu`           | —                   | `ubuntu-latest`      | Glibc Linux x64, voor klassieke distro-compatibiliteit.      |
-| `x86_64-macos`               | `macos-x64`         | `macos-latest`       | macOS Intel, vergelijkbaar met `aarch64-macos`.              |
+| `x86_64-linux-musl`          | `linux-x64`         | `ubuntu-latest`      | Static Linux x64, ideal for “glue-free” distributables.      |
+| `x86_64-linux-gnu`           | —                   | `ubuntu-latest`      | Glibc Linux x64, for classic distro compatibility.           |
+| `x86_64-macos`               | `macos-x64`         | `macos-latest`       | macOS Intel, similar to `aarch64-macos`.                     |
 | `armv7-linux-gnueabihf`      | —                   | `ubuntu-latest`      | 32-bit ARM (older Pi / embedded).                            |
-| `riscv64-linux-gnu`          | —                   | `ubuntu-latest`      | RISC-V 64-bit, up-and-coming architectuur.                   |
+| `riscv64-linux-gnu`          | —                   | `ubuntu-latest`      | RISC-V 64-bit, up-and-coming architecture.                   |
 
-**Richtlijn:**
+**Guideline:**
 
-- Als het target qua vorm lijkt op een Tier-1 target en door Zig ondersteund wordt, mag je
-  redelijkerwijs verwachten dat de Action werkt.
-- Zie je issues op deze targets, open gerust een issue met:
+- If the target resembles a Tier-1 target and is supported by Zig, you can reasonably expect the Action to work.
+- If you encounter issues on these targets, please open an issue with:
   - Host OS
-  - Zig versie
+  - Zig version
   - Target triple
-  - Build command + volledige linker error
+  - Build command + full linker error
 
 ---
 
 ## Tier 3 – Best effort / exotic
 
-Voorbeelden van meer exotische Zig-targets die *theoretisch* moeten werken, maar niet in deze repo
-geautomatiseerd getest worden:
+Examples of more exotic Zig targets that *theoretically* should work, but are not automatically tested in this repo:
 
 | Target triple                 | Type               |
 | ---------------------------- | ------------------ |
@@ -74,15 +67,13 @@ geautomatiseerd getest worden:
 | `s390x-linux-gnu`            | IBM Z / mainframe  |
 | …                            | …                  |
 
-Use-case: niche deployments, HPC, mainframe. Hier geldt: als Zig het target ondersteunt, zorgt de
-Action er *alleen* voor dat `CC` / `CXX` en de relevante env-vars goed gezet worden. Extra toolchain
-en sysroot-issues vallen buiten scope.
+Use-case: niche deployments, HPC, mainframe. The rule here is: if Zig supports the target, the Action will *only* ensure `CC` / `CXX` and relevant env vars are set correctly. Issues related to extra toolchains or sysroots are out of scope.
 
 ---
 
 ## Target aliasing
 
-De Action ondersteunt een aantal human-friendly aliases, die omgezet worden naar Zig-targets:
+The Action supports several human-friendly aliases, which match to Zig targets:
 
 | Alias          | Zig target triple      |
 | -------------- | ---------------------- |
@@ -97,17 +88,14 @@ De Action ondersteunt een aantal human-friendly aliases, die omgezet worden naar
 | `windows-x64`  | `x86_64-windows-gnu`   |
 | `windows-amd64`| `x86_64-windows-gnu`   |
 
-Wil je heel specifiek zijn (bijvoorbeeld een bepaalde glibc-versie), gebruik dan de volledige Zig
-target triple, zoals `x86_64-linux-gnu.2.31`. Let wel: Rust-integratie wordt alleen automatisch
-geconfigureerd voor targets **zonder** versie suffix.
+If you want to be very specific (e.g., a specific glibc version), use the full Zig target triple, such as `x86_64-linux-gnu.2.31`. Note: Rust integration is automatically configured only for targets **without** a version suffix.
 
 ---
 
 ## Host OS support
 
-- ✅ **Ubuntu (Linux) runners** – volledig ondersteund
-- ✅ **macOS runners** – volledig ondersteund
-- ❌ **Windows runners** – worden actief geweigerd als host (`RUNNER_OS == Windows` → hard fail)
+- ✅ **Ubuntu (Linux) runners** – fully supported
+- ✅ **macOS runners** – fully supported
+- ❌ **Windows runners** – actively rejected as host (`RUNNER_OS == Windows` → hard fail)
 
-Windows is uitsluitend ondersteund als *target* (via `x86_64-windows-gnu`), niet als platform waarop
-de Action zelf draait.
+Windows is supported solely as a *target* (via `x86_64-windows-gnu`), not as a platform to run the Action on.

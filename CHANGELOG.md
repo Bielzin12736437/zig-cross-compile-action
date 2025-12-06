@@ -1,36 +1,36 @@
 # Changelog
 
-Alle noemenswaardige wijzigingen aan deze Action worden in dit bestand bijgehouden.
+All notable changes to this project will be documented in this file.
 
-Het formaat is geïnspireerd door [Keep a Changelog](https://keepachangelog.com/) en het project
-volgt [Semantic Versioning](https://semver.org/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-**Voorstellen / ideeën (nog niet geïmplementeerd):**
+**Proposals / Ideas (Not yet implemented):**
 
-- Extra `verify-level: precise` voor strakkere binary-checks (bijvoorbeeld via `readelf` / `otool`).
-- Uitgebreidere C-matrix in E2E (meer Tier-1 targets).
-- Eventuele tweede Action specifiek voor Zig-installatie (TypeScript/Node-based).
+- Extra `verify-level: precise` for stricter binary checks (e.g., via `readelf` / `otool`).
+- Expanded C-matrix in E2E (more Tier-1 targets).
+- Potential second Action specifically for Zig installation (TypeScript/Node-based).
 
 ---
 
 ## [2.4.3] – Marketplace Final Fix
 
-**Gewijzigd**
+**Changed**
 - **Critical Fix:** `action.yml` uses correct `${{ ... }}` syntax for composite conditional.
 - **Verified:** `setup-env.sh` shebang is `#!/usr/bin/env bash`.
 
 ## [2.4.2] – Final Polish
 
-**Gewijzigd**
-- Docs cleaned up (removed safe_exit refs, AI-isms).
+**Changed**
+- Docs cleaned up.
 - Contact info standardized to `info@logvault.eu`.
-- Action branding applied (cpu/purple).
+- Action branding applied.
 
 ## [2.4.0] – Roadmap Execution
 
-**Toegevoegd**
+**Added**
 - `verify-level` input (`none` | `basic`).
 - Enhanced Rust+Musl error messages with fix suggestions.
 - Debug logging shows `cargo version` if present.
@@ -38,97 +38,96 @@ volgt [Semantic Versioning](https://semver.org/).
 
 ## [2.3.0] – macOS verification & polish
 
-**Toegevoegd**
+**Added**
 
-- E2E-job `C macos-arm64` op `macos-latest`:
-  - Bouwt een simpele C-binary met `target: aarch64-macos`.
-  - Verifieert output via `file` op Mach-O formaat.
+- E2E-job `C macos-arm64` on `macos-latest`:
+  - Builds a simple C binary with `target: aarch64-macos`.
+  - Verifies output via `file` for Mach-O format.
+- New input `verify-level`:
+  - `basic` (default): runs a lightweight `file` scan on binaries in the workspace.
+  - `none`: skips the verify step entirely.
 
-**Gewijzigd**
+**Changed**
 
-- `project-type: c` zet nu expliciet `CGO_ENABLED=0`, zodat C-builds geen last hebben van een
-  aanwezige Go-toolchain in mixed repositories.
-- README uitgebreid met praktische integratievoorbeelden:
+- `project-type: c` now explicitly sets `CGO_ENABLED=0`, so C-builds are not affected by a Go toolchain in mixed repositories.
+- README expanded with practical integration examples:
   - CMake (`CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER`)
   - Autotools (`./configure --host=$ZIG_TARGET`)
   - Make (`make CC="$CC" CXX="$CXX"`)
-- ARCHITECTURE.md aangewezen als “single source of truth” voor het interne ontwerp en beleid.
+- ARCHITECTURE.md designated as the “single source of truth” for internal design and policy.
 
 ---
 
 ## [2.2.0] – Design & documentation hardening
 
-**Toegevoegd**
+**Added**
 
-- Uitgebreide technische documentatie:
-  - `ARCHITECTURE.md` met:
+- Comprehensive technical documentation:
+  - `ARCHITECTURE.md` containing:
     - Scope & non-goals
-    - Input-contract (`target`, `project-type`, `rust-musl-mode`, `cmd`)
-    - Beschrijving van de environment controller (`setup-env.sh`)
-- Duidelijke beschrijving van:
-  - “Infrastructure, not helper”-filosofie.
-  - Opinionated omgeving (bewust overschrijven van `CC`, `CXX`, `AR`, `RANLIB`, etc.).
+    - Input contract (`target`, `project-type`, `rust-musl-mode`, `cmd`)
+    - Description of the environment controller (`setup-env.sh`)
+- Clear description of:
+  - “Infrastructure, not helper” philosophy.
+  - Opinionated environment (deliberately overwriting `CC`, `CXX`, `AR`, `RANLIB`, etc.).
 
-**Gewijzigd**
+**Changed**
 
-- Documentatie rond auto-detect van `project-type`:
-  - Legt uit dat auto-detect alleen de **repo root** inspecteert (`Cargo.toml`, `go.mod`).
-  - Aanbevolen patterns voor monorepo’s toegevoegd (expliciet `project-type` zetten of
-    `working-directory` aanpassen in de workflow).
+- Documentation around `project-type` auto-detection:
+  - Explains that auto-detect only inspects the **repo root** (`Cargo.toml`, `go.mod`).
+  - Added recommended patterns for monorepos (setting `project-type` explicitly or adjusting `working-directory` in the workflow).
 
 ---
 
 ## [2.1.0] – Production hardening
 
-**Toegevoegd**
+**Added**
 
-- Hard policy voor Windows host-runners:
-  - Builds falen nu expliciet als `RUNNER_OS == Windows`.
-  - Windows blijft ondersteund als *target* (`x86_64-windows-gnu`), niet als host.
+- Hard policy for Windows host-runners:
+  - Builds now fail explicitly if `RUNNER_OS == Windows`.
+  - Windows remains supported as a *target* (`x86_64-windows-gnu`), not as a host.
 - Rust+Musl policy:
-  - Nieuwe input `rust-musl-mode`:
-    - `deny` (default): Rust+Musl builds falen met een duidelijke foutmelding en suggesties.
-    - `warn`: laat de build door maar logt een waarschuwing.
-    - `allow`: ondersteunt Rust+Musl “as is”, met waarschuwing voor mogelijke CRT-conflicten.
+  - New input `rust-musl-mode`:
+    - `deny` (default): Rust+Musl builds fail with a clear error message and suggestions.
+    - `warn`: allows the build but logs a warning.
+    - `allow`: supports Rust+Musl “as is”, with a warning about possible CRT conflicts.
 - Debug logging via `ZIG_ACTION_DEBUG=1`:
-  - Extra env-dump van relevante variabelen (`ZIG_*`, `GO*`, `CARGO_*`, `CC`, `CXX`).
-  - Logt ook `cargo version` indien beschikbaar.
+  - Extra env-dump of relevant variables (`ZIG_*`, `GO*`, `CARGO_*`, `CC`, `CXX`).
+  - Also logs `cargo version` if available.
 
-**Gewijzigd**
+**Changed**
 
-- Logging geüniformeerd naar GitHub Action log-annotaties:
+- Logging unified to GitHub Action log annotations:
   - `::notice::[zig-action] ...`
   - `::debug::[zig-action] ...`
   - `::error::[zig-action] ...`
 - Rust-linker wrapper:
-  - Wrapper scripts worden nu in `${RUNNER_TEMP}/zig-wrappers` met `mktemp` aangemaakt,
-    zodat parallel builds voor meerdere targets in één job elkaar niet in de weg zitten.
+  - Wrapper scripts are now created in `${RUNNER_TEMP}/zig-wrappers` using `mktemp`, preventing conflicts between parallel builds for multiple targets in a single job.
 
 ---
 
 ## [2.0.0] – Initial v2 release
 
-> Let op: exacte details van v2.0.0 kunnen afwijken; deze sectie beschrijft de grote lijnen
-> van de eerste stabiele v2-serie.
+> Note: Exact details of v2.0.0 may vary; this section describes the broad strokes of the first stable v2 series.
 
-**Toegevoegd**
+**Added**
 
-- Eerste stabiele compositie van de Action:
-  - `action.yml` met inputs:
+- First stable composition of the Action:
+  - `action.yml` with inputs:
     - `version`
     - `target`
     - `project-type`
     - `cmd`
-  - `setup-env.sh` met:
-    - Target-aliasing (bijv. `linux-arm64` → `aarch64-linux-musl`).
-    - Basis-env exports:
+  - `setup-env.sh` with:
+    - Target aliasing (e.g. `linux-arm64` → `aarch64-linux-musl`).
+    - Base env exports:
       - `CC="zig cc -target ..."`
       - `CXX="zig c++ -target ..."`
       - `AR="zig ar"`
       - `RANLIB="zig ranlib"`
-- Eenvoudige heuristische verificatie:
-  - `find . -maxdepth ... | file` om ELF/Mach-O/PE-binaries te detecteren.
-- Basis support voor:
+- Simple heuristic verification:
+  - `find . -maxdepth ... | file` to detect ELF/Mach-O/PE binaries.
+- Basic support for:
   - Go (CGO) via `CGO_ENABLED`, `GOOS`, `GOARCH`.
   - Rust via `CARGO_TARGET_<TRIPLE>_LINKER` wrapper.
   - C/C++ via `$CC` / `$CXX`.
@@ -137,8 +136,6 @@ volgt [Semantic Versioning](https://semver.org/).
 
 ## [1.x.x] – Legacy
 
-De 1.x-serie was de oorspronkelijke experimentele variant van de Action, vóór de huidige
-production-grade policies (geen Windows host, stricte Rust+Musl regels, debug-mode, enz.).
+The 1.x series was the original experimental variant of the Action, before the current production-grade policies (no Windows host, strict Rust+Musl rules, debug-mode, etc.) were established.
 
-Nieuwe projecten wordt aangeraden **minstens v2** te gebruiken en bij voorkeur
-naar de laatste `v2.x` te pinnen.
+New projects are advised to use **at least v2** and preferably pin to the latest `v2.x`.
