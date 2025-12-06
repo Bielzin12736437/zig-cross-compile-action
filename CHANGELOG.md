@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Changed**
 - **Musl Policy Docs:** Explicitly documented `rust-musl-mode: allow` as "wiring only" in `ARCHITECTURE.md`.
 
+### Performance & Caching
+
+- Documented a recommended `actions/cache@v4` configuration for Zig’s global compilation cache (`~/.cache/zig`) to reduce cross-compilation overhead in CI.
+- Clarified that language/toolchain caches (Cargo `target/`, Go build cache, etc.) remain the responsibility of language-specific tooling and are intentionally out of scope for this action.
+- Dogfooded the Zig cache pattern in the internal validation workflow to verify the setup end-to-end before recommending it to users.
+
 ---
 
 ## [2.5.1] – Documentation & Test Fixes

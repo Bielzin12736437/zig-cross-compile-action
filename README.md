@@ -254,19 +254,65 @@ steps:
       cmd: cargo build --release --target aarch64-unknown-linux-gnu
 ```
 
-## Optional: Zig Caching
+## Performance & Caching ⚡️
 
-The Action itself is cache-agnostic, but you can speed up CI by caching Zig’s local data:
+By default, `zig-cross-compile-action` is stateless: each job installs Zig and recompiles the standard libraries / CRTs it needs. For small projects this is fine; for larger ones it can add tens of seconds of overhead per job.
+
+If you run on GitHub-hosted runners, you can reuse Zig’s **global compilation cache** between jobs using `actions/cache@v4`.
+
+### Recommended cache snippet (Zig toolchain state)
+
+Add this *before* `setup-zig` in your job:
 
 ```yaml
-- uses: actions/cache@v4
+- name: Cache Zig compilation state
+  uses: actions/cache@v4
   with:
-    path: ~/.cache/zig
-    key: zig-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}
+    path: |
+      ~/.cache/zig
+    key: zig-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/go.mod', '**/Cargo.lock', '**/build.zig.zon') }}
     restore-keys: |
-      zig-${{ inputs.version }}-${{ runner.os }}-
-      zig-${{ inputs.version }}-
+      zig-cache-${{ runner.os }}-${{ runner.arch }}-
 ```
+
+Then call Zig and this action as usual:
+
+```yaml
+- uses: goto-bus-stop/setup-zig@v2
+  with:
+    zig-version: 0.13.0
+
+- uses: Rul1an/zig-cross-compile-action@v2
+  with:
+    target: linux-arm64
+    project-type: go
+    cmd: |
+      go build ./...
+```
+
+This cache:
+
+*   ✅ speeds up repeated cross-builds by reusing compiled Zig standard libraries and downloaded CRT headers.
+*   ❌ does not cache your project outputs (Rust `target/`, Go build cache, etc.).
+
+### Language-specific caches
+
+For project build artifacts, use language-specific caches alongside the Zig cache:
+
+*   **Rust:** Use [swatinem/rust-cache](https://github.com/Swatinem/rust-cache) for `target/` and Cargo registry.
+*   **Go:** `actions/setup-go@v5` already provides module caching.
+
+### Advanced: per-target cache keys
+
+If you build many different targets and want stricter cache separation, you can include the Zig target in the cache key:
+
+```yaml
+    key: zig-cache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-${{ hashFiles('**/go.mod', '**/Cargo.lock', '**/build.zig.zon') }}
+```
+
+**Notes:**
+*   Use one Zig caching strategy per repository. If you switch to a Zig installer that manages `~/.cache/zig` itself (e.g. `mlugg/setup-zig`), do not double-cache here.
+*   On self-hosted runners, ensure caching `~/.cache/zig` aligns with your organization's security policies.
 
 ## Debugging
 
