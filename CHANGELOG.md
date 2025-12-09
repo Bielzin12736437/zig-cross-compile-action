@@ -19,7 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.6.0] – 2025-12-06
+## [3.0.0] – 2025-12-09
+
+**Major Features**
+
+*   **Strict Foundation:** `action.yml` now defaults to `strict_version: true` (mandatory checksums).
+*   **Custom Installer:** Replaced `goto-bus-stop/setup-zig` with `scripts/install-zig.sh` (robust, audit-friendly, uses strict SHA256 verification from `ziglang.org/download/index.json`).
+*   **Target Presets:** New `target_preset` input for easy aliases (`linux-x86_64`, `linux-arm64-musl`, etc.).
+*   **Setup Only:** New `setup_only` input to configure toolchain/env without running a build command.
+*   **Caching:** Added `use_cache` support for `~/.cache/zig`.
+*   **QA Hooks:** Added `run_tests` / `test_script` and `perf_command` inputs.
+*   **Supply Chain Security:** Added `sbom` (Syft) and `sign` (Cosign keyless) inputs for Linux runners.
+
+**Changed**
+
+*   **Input Standardization:** New inputs use `snake_case` (e.g. `test_script`, `sbom_target`). Legacy inputs (`version`, `target`, `project-type`) remain for backward compatibility.
+*   **Deprecation:** `verify-level` is now a no-op.
+*   **Environment:** `project-type` now strictly focuses on environment setup; build commands are generic.
 
 **Added**
 
