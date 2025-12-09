@@ -198,7 +198,7 @@ runs:
            exit 1
          fi
          "${GITHUB_ACTION_PATH}/scripts/tools-audit.sh" syft
-         syft packages "file:${{ inputs.sbom_target }}" -o "${{ inputs.sbom_format }}" > "${{ inputs.sbom_output }}"
+         syft scan "file:${{ inputs.sbom_target }}" -o "${{ inputs.sbom_format }}" > "${{ inputs.sbom_output }}"
 
     - name: Sign Artifact
       if: ${{ inputs.sign == 'true' }}

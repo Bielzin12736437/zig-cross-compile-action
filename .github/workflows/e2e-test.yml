@@ -5,6 +5,10 @@ on:
     branches: [main, master, feat/zig-cca-v3]
   pull_request:
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   test-minimal:
     runs-on: ubuntu-latest

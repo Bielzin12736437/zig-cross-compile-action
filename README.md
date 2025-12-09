@@ -50,6 +50,9 @@ Run tests, benchmark, and build with caching enabled.
 ### 3. Hardened Release (SBOM + Signing)
 Generate accurate SBOMs and sign artifacts (Linux runners only).
 
+> [!IMPORTANT]
+> Keyless signing requires `permissions: id-token: write` in your workflow.
+
 ```yaml
 - uses: Rul1an/zig-cross-compile-action@v3
   with:
