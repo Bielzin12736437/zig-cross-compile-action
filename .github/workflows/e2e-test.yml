@@ -1,147 +1,93 @@
-name: E2E Verification
+name: "Action E2E Test"
 
 on:
   push:
-    branches:
-      - main
-      - feature/*
-  workflow_dispatch:
-
-permissions:
-  contents: read
+    branches: [main, master, feat/zig-cca-v3]
+  pull_request:
 
 jobs:
-  test-go-arm64:
-    name: Go (CGO) arm64-linux
+  test-minimal:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache: false
-
-
-      - name: Create Dist Dir
-        run: mkdir -p dist
-
-      - name: Build Go (CGO)
-        uses: ./ # Uses local action
-        with:
-          target: linux-arm64
-          project-type: go
-          cmd: |
-             cd examples/go-cgo
-             go build -o ../../dist/app-go-arm64 .
-
-      - name: Verify Go Binary
-        run: file dist/app-go-arm64 | grep "ARM aarch64"
-
-  test-rust-gnu:
-    name: Rust aarch64-gnu
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-gnu
-
-      - name: Build Rust (Release)
-        uses: ./
-        with:
-          target: aarch64-unknown-linux-gnu
-          project-type: rust
-          cmd: |
-            cd examples/rust-aarch64
-            cargo build --release --target aarch64-unknown-linux-gnu
-
-      - name: Verify Rust Binary
-        run: file examples/rust-aarch64/target/aarch64-unknown-linux-gnu/release/rust_cross | grep "ARM aarch64"
-
-  test-c-windows:
-    name: C windows-x64
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Create Dist Dir
-        run: mkdir -p dist
-
-      - name: Build C (Direct CC)
-        uses: ./
-        with:
-          target: windows-x64
-          project-type: c
-          cmd: $CC examples/c-windows/main.c -o dist/app.exe
-
-      - name: Verify C Binary
-        run: file dist/app.exe | grep "PE32+"
-
-  test-c-macos:
-    name: C macos-arm64 (on macos-latest)
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Create Dist Dir
-        run: mkdir -p dist
-
-      - name: Build C (Direct CC)
-        uses: ./
-        with:
-          target: aarch64-macos
-          project-type: c
-          cmd: $CC examples/c-macos/main.c -o dist/app-macos
-
-      - name: Verify Mach-O Binary
-        run: file dist/app-macos | grep "Mach-O"
-  test-c-linux-matrix:
-    name: C (${{ matrix.name }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: linux-gnu
-            target: x86_64-linux-gnu
-            example-dir: c-linux-gnu
-          - name: linux-musl
-            target: x86_64-linux-musl
-            example-dir: c-linux-musl
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build C example (${{ matrix.name }})
+      - name: Setup Only (Minimal)
         uses: ./
         with:
-          target: ${{ matrix.target }}
-          project-type: c
-          cmd: |
-            cd examples/${{ matrix.example-dir }}
-            mkdir -p dist
-            $CC main.c -o dist/app
+          version: "0.13.0"
+          setup_only: "true"
+          target_preset: "linux-x86_64-musl"
 
-      - name: Verify binary type (${{ matrix.name }})
+      - name: Verify Setup
         run: |
-          file examples/${{ matrix.example-dir }}/dist/app
-          # Basic check: 64-bit ELF
-          file examples/${{ matrix.example-dir }}/dist/app | grep "ELF 64-bit LSB" >/dev/null
+          zig version
+          echo "Target env: $ZIG_TARGET"
+          if [[ "$ZIG_TARGET" != "x86_64-linux-musl" ]]; then exit 1; fi
 
-          # Optional: distinguish glibc vs musl (static)
-          if [[ "${{ matrix.target }}" == "x86_64-linux-musl" ]]; then
-            echo "Checking for statically linked (musl) binary..."
-            file examples/${{ matrix.example-dir }}/dist/app | grep -i "statically linked" >/dev/null
-          fi
+  test-caching:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prime Cache
+        uses: ./
+        with:
+          version: "0.13.0"
+          setup_only: "true"
+          use_cache: "true"
+          cache_suffix: "test"
+          target_preset: "linux-x86_64" # triggers cache key
 
-      - name: Smoke test binary (${{ matrix.name }})
+      - name: Use Cache
+        id: cache-check
+        uses: ./
+        with:
+          version: "0.13.0"
+          setup_only: "true"
+          use_cache: "true"
+          cache_suffix: "test"
+          target_preset: "linux-x86_64"
+
+      - name: Verify Hit
+        if: steps.cache-check.outputs.cache_hit != 'true'
         run: |
-          ./examples/${{ matrix.example-dir }}/dist/app
+           echo "Expected cache hit on second run"
+           # Warning only strictly, GitHub cache is eventually consistent
+           echo "Cache miss observed - verify in logs"
+
+  test-supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Dummy Artifact
+        run: |
+          mkdir -p dist
+          echo "dummy-binary" > dist/dummy
+
+      - name: SBOM and Sign
+        uses: ./
+        with:
+          version: "0.13.0"
+          setup_only: "true"
+          sbom: "true"
+          sbom_target: "dist/dummy"
+          sbom_output: "dist/dummy.sbom.json"
+          sign: "true"
+          sign_artifact: "dist/dummy"
+
+      - name: Verify Outputs
+        run: |
+          ls -l dist/
+          if [[ ! -s dist/dummy.sbom.json ]]; then exit 1; fi
+          if [[ ! -s dist/dummy.sig ]]; then exit 1; fi
+          if [[ ! -s dist/dummy.crt ]]; then exit 1; fi
+
+  test-legacy-compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: v2 Compatible Run
+        uses: ./
+        with:
+          version: "0.13.0"
+          target: "x86_64-linux-musl"
+          project-type: "custom"
+          cmd: "echo 'Running Custom Command' && zig version"

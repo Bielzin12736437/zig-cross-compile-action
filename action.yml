@@ -1,63 +1,212 @@
-name: 'Zig Cross-Compiler'
-description: 'Zero-dependency cross-compilation for C, C++, Rust, and Go using Zig.'
+name: 'Zig Cross-Compile Action'
+description: 'Secure, cached, polyglot cross-compilation toolchain using Zig.'
 author: 'Rul1an'
 branding:
-  icon: 'cpu'
-  color: 'purple'
+  icon: 'package'
+  color: 'green'
+
 inputs:
+  # --- v2 Legacy Inputs (Backwards Compatible) ---
   version:
-    description: 'Zig version to install'
+    description: "Zig version (e.g. 0.13.0, 0.13.x, stable)"
     required: false
-    default: '0.13.0'
+    default: "0.13.0"
   target:
-    description: 'Target architecture (e.g., linux-arm64, x86_64-linux-gnu)'
-    required: true
+    description: "Zig target triple (e.g. x86_64-linux-gnu). Supersedes target_preset."
+    required: false
   project-type:
-    description: 'Language preset (auto, go, rust, c, custom)'
+    description: "Project type: zig | c/go/rust/custom (polyglot env support only)"
     required: false
-    default: 'auto'
-  rust-musl-mode:
-    description: 'Policy for Rust+Musl targets: deny (fail), warn (log), allow (silent-ish)'
-    required: false
-    default: 'deny'
-  verify-level:
-    description: 'Post-build verification: none | basic'
-    required: false
-    default: 'basic'
+    default: "custom"
   cmd:
-    description: 'Build command to execute'
-    required: true
+    description: "Build command to execute (run depends on project-type)"
+    required: false
+    default: ""
+  verify-level:
+    description: "Deprecated: no-op in v3."
+    required: false
+    default: "basic"
+
+  # --- v3 New Features ---
+  strict_version:
+    description: "Fail if the exact version cannot be resolved"
+    required: false
+    default: "true"
+
+  setup_only:
+    description: "Only set up toolchain/env, do not run build command"
+    required: false
+    default: "false"
+
+  target_preset:
+    description: "Target alias (e.g. linux-x86_64-musl, macos-arm64)"
+    required: false
+
+  use_cache:
+    description: "Enable caching of Zig artifacts (~/.cache/zig)"
+    required: false
+    default: "false"
+  cache_suffix:
+    description: "Optional suffix for cache keys"
+    required: false
+    default: ""
+
+  run_tests:
+    description: "Run tests before build"
+    required: false
+    default: "false"
+  test_script:
+    description: "Script to execute tests"
+    required: false
+    default: ""
+
+  perf_command:
+    description: "Optional performance benchmark command"
+    required: false
+    default: ""
+
+  sbom:
+    description: "Generate SBOM using Syft (Linux only)"
+    required: false
+    default: "false"
+  sbom_format:
+    description: "SBOM format"
+    required: false
+    default: "cyclonedx-json"
+  sbom_target:
+    description: "Path to input artifact for SBOM generation"
+    required: false
+    default: ""
+  sbom_output:
+    description: "SBOM output path"
+    required: false
+    default: "dist/sbom.cdx.json"
+
+  sign:
+    description: "Sign artifact using Cosign (Linux only)"
+    required: false
+    default: "false"
+  sign_artifact:
+    description: "Path to artifact to sign"
+    required: false
+    default: ""
+
+outputs:
+  zig_path:
+    description: "Path to installed Zig binary"
+    value: ${{ steps.install-zig.outputs.zig_path }}
+  zig_version_resolved:
+    description: "Resolved Zig version"
+    value: ${{ steps.install-zig.outputs.zig_version_resolved }}
+  zig_target_triple:
+    description: "Resolved target triple"
+    value: ${{ steps.setup-env.outputs.zig_target_triple }}
+  cache_hit:
+    description: "Cache hit status"
+    value: ${{ steps.cache-zig.outputs.cache-hit }}
 
 runs:
   using: "composite"
   steps:
-    - name: Setup Zig Cross-Compiler Environment
+    - name: Install Zig
+      id: install-zig
       shell: bash
       env:
-        INPUT_TARGET: ${{ inputs.target }}
+        ZIG_VERSION: ${{ inputs.version }}
+        STRICT_VERSION: ${{ inputs.strict_version }}
+      run: |
+        "${GITHUB_ACTION_PATH}/scripts/install-zig.sh"
+
+    - name: Setup Environment
+      id: setup-env
+      shell: bash
+      env:
+        INPUT_TARGET_PRESET: ${{ inputs.target_preset }}
+        INPUT_ZIG_TARGET: ${{ inputs.target }}
         INPUT_PROJECT_TYPE: ${{ inputs.project-type }}
-        INPUT_RUST_MUSL_MODE: ${{ inputs.rust-musl-mode }}
+        INPUT_SETUP_ONLY: ${{ inputs.setup_only }}
       run: |
-        # Resolve script path relative to action location
-        SCRIPT_PATH="${GITHUB_ACTION_PATH}/setup-env.sh"
-        source "$SCRIPT_PATH"
+        source "${GITHUB_ACTION_PATH}/scripts/setup-env.sh"
 
-    - name: Install Zig
-      uses: goto-bus-stop/setup-zig@v2
+    - name: Restore Zig Cache
+      if: ${{ inputs.use_cache == 'true' }}
+      id: cache-zig
+      uses: actions/cache@v4
       with:
-        version: ${{ inputs.version }}
-        cache: false
+        path: |
+           ~/.cache/zig
+           zig-cache
+        key: zig-${{ runner.os }}-${{ inputs.version }}-${{ steps.setup-env.outputs.zig_target_triple }}-${{ hashFiles('build.zig','build.zig.zon','Cargo.lock','go.mod') }}-${{ inputs.cache_suffix }}
+        restore-keys: |
+          zig-${{ runner.os }}-${{ inputs.version }}-
 
-    - name: Execute Build Command
+    - name: Run Tests
+      if: ${{ inputs.run_tests == 'true' && inputs.test_script != '' }}
       shell: bash
       run: |
-        echo "Running cross-compilation for ${{ inputs.target }}..."
-        ${{ inputs.cmd }}
+        echo "::group::Run Tests"
+        set -euo pipefail
+        # Execute passed script in the workspace context
+        bash -e <<'EOF'
+        ${{ inputs.test_script }}
+        EOF
+        echo "::endgroup::"
 
-    - name: Verify Output (Optional)
+    - name: Run Performance Checks
+      if: ${{ inputs.perf_command != '' }}
       shell: bash
-      if: ${{ success() && runner.os != 'Windows' && inputs['verify-level'] != 'none' }}
       run: |
-        echo "Checking for output artifacts..."
-        # Heuristic to find binary
-        find . -maxdepth 3 -type f -not -path '*/.*' -exec file {} \; | grep -i "ELF\|Mach-O\|PE32" || echo "No obvious binaries found to verify."
+         echo "::group::Run Perf Check"
+         set -euo pipefail
+         ${{ inputs.perf_command }}
+         echo "::endgroup::"
+
+    - name: Build (Project Type Aware)
+      if: ${{ inputs.setup_only != 'true' }}
+      shell: bash
+      env:
+         CMD: ${{ inputs.cmd }}
+         PROJECT_TYPE: ${{ inputs.project-type }}
+      run: |
+         echo "::group::Build ($PROJECT_TYPE)"
+         set -euo pipefail
+
+         case "$PROJECT_TYPE" in
+            zig)
+                # Helper for 'project-type: zig'
+                zig build -Dtarget=${ZIG_TARGET} $CMD
+                ;;
+            custom|c|go|rust|auto)
+                # v2 compatible: run the user's cmd if provided.
+                if [ -n "$CMD" ]; then
+                     eval "$CMD"
+                fi
+                ;;
+            *)
+                echo "Unknown project-type: $PROJECT_TYPE"
+                exit 1
+                ;;
+         esac
+         echo "::endgroup::"
+
+    - name: Generate SBOM
+      if: ${{ inputs.sbom == 'true' }}
+      shell: bash
+      run: |
+         if [ -z "${{ inputs.sbom_target }}" ]; then
+           echo "::error::sbom_target is required when sbom=true"
+           exit 1
+         fi
+         "${GITHUB_ACTION_PATH}/scripts/tools-audit.sh" syft
+         syft packages "file:${{ inputs.sbom_target }}" -o "${{ inputs.sbom_format }}" > "${{ inputs.sbom_output }}"
+
+    - name: Sign Artifact
+      if: ${{ inputs.sign == 'true' }}
+      shell: bash
+      run: |
+         "${GITHUB_ACTION_PATH}/scripts/tools-audit.sh" cosign
+         COSIGN_EXPERIMENTAL=1 cosign sign-blob \
+           --yes \
+           --output-signature "${{ inputs.sign_artifact }}.sig" \
+           --output-certificate "${{ inputs.sign_artifact }}.crt" \
+           "${{ inputs.sign_artifact }}"
